@@ -97,11 +97,11 @@ const handleCreatorCommands = async (sock, m, messageText) => {
             return true;
         case isGroup && command.startsWith('.anuncio '):
             const announcement = messageText.split(' ').slice(1).join(' ');
-            const groups = await sock.groupFetchAllParticipating();
-            for (const group of Object.values(groups)) {
+            const groupsForAnnouncement = await sock.groupFetchAllParticipating();
+            for (const group of Object.values(groupsForAnnouncement)) {
                 await sock.sendMessage(group.id, { text: `📢 *ANUNCIO DEL CREADOR:*\n\n${announcement}` });
             }
-            await sock.sendMessage(senderJid, { text: `✅ Anuncio enviado a ${Object.keys(groups).length} grupos.` });
+            await sock.sendMessage(senderJid, { text: `✅ Anuncio enviado a ${Object.keys(groupsForAnnouncement).length} grupos.` });
             return true;
         case command.startsWith('.bienvenida'):
             if (args[1] === 'on') {
@@ -111,9 +111,9 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 isWelcomeMessageEnabled = false;
                 await sock.sendMessage(senderJid, { text: '❌ Mensaje de bienvenida desactivado.' });
             } else if (args[1] === 'lista') {
-                const groups = await sock.groupFetchAllParticipating();
+                const groupsForList = await sock.groupFetchAllParticipating();
                 let listMessage = "Lista de Grupos:\n\n";
-                Object.values(groups).forEach((group, index) => {
+                Object.values(groupsForList).forEach((group, index) => {
                     listMessage += `${index + 1}. ${group.subject}\n`;
                 });
                 await sock.sendMessage(senderJid, { text: listMessage });
@@ -125,8 +125,8 @@ const handleCreatorCommands = async (sock, m, messageText) => {
             }
             return true;
         case command.startsWith('.spam'):
-            const groups = await sock.groupFetchAllParticipating();
-            const groupList = Object.values(groups);
+            const groupsForSpam = await sock.groupFetchAllParticipating();
+            const groupList = Object.values(groupsForSpam);
             const groupIndex = parseInt(args[1], 10) - 1;
             const customMessage = args.slice(2).join(' ');
 
