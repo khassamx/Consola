@@ -1,23 +1,24 @@
 const fs = require('fs');
+const path = require('path');
 
-const log = (message) => {
-    console.log(`> ✅ Log: ${message}`);
-};
+const logFilePath = path.join(__dirname, '..', '..', 'logs', 'bot.log');
+const errorFilePath = path.join(__dirname, '..', '..', 'logs', 'error.log');
 
-const logError = (message) => {
-    console.error(`> ❌ Error: ${message}`);
-};
+function log(message) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] [INFO] ${message}\n`;
+    console.log(logMessage);
+    fs.appendFileSync(logFilePath, logMessage, 'utf8');
+}
 
-const appendLogFile = (filePath, content) => {
-    try {
-        fs.appendFileSync(filePath, content + '\n');
-    } catch (e) {
-        logError(`Error al escribir en el archivo de log: ${e.message}`);
-    }
-};
+function logError(message) {
+    const timestamp = new Date().toISOString();
+    const logMessage = `[${timestamp}] [ERROR] ${message}\n`;
+    console.error(logMessage);
+    fs.appendFileSync(errorFilePath, logMessage, 'utf8');
+}
 
 module.exports = {
     log,
-    logError,
-    appendLogFile
+    logError
 };
