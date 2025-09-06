@@ -1,65 +1,64 @@
-const os = require('os');
-const { botVersion, botMode } = require('../config');
+const { isAntiSpamEnabled, ANTI_SPAM_THRESHOLD } = require('../config');
 
-const sendMenu = async (sock, jid) => {
-    const menuMessage = `
-╔════════════════════╗
-🌟 ⚙️ MENÚ DE COMANDOS 🌟
-Creado por NoaDevStudio
-╚════════════════════╝
+// Mapa para guardar el último mensaje de cada usuario y prevenir spam
+const lastMessageTimestamps = new Map();
 
-✨ Comandos Generales:
+// Función que verifica si un mensaje es spam
+const isSpam = (senderJid) => {
+    const now = Date.now();
+    const lastMessageTime = lastMessageTimestamps.get(senderJid) || 0;
+    const timeElapsed = now - lastMessageTime;
 
-📝 ~menu  —  Muestra este menú de comandos.
-📊 !estado — Muestra el estado del bot y su versión.
-🎲 !dado  — Lanza un dado.
-🎱 !8ball — Haz una pregunta y recibe una respuesta.
+    if (timeElapsed < ANTI_SPAM_THRESHOLD) {
+        return true;
+    }
 
-💡 Para usar los comandos, solo escribe el comando en el chat.
-`
-    await sock.sendMessage(jid, { text: menuMessage });
+    lastMessageTimestamps.set(senderJid, now);
+    return false;
 };
 
+// Función que maneja los comandos generales del bot
 const handleGeneralCommands = async (sock, m, messageText) => {
     const senderJid = m.key.remoteJid;
     const command = messageText.toLowerCase().trim();
 
-    switch (true) {
-        case command === '~menu':
-        case command === '!ayuda':
-        case command === '!help':
-            await sendMenu(sock, senderJid);
+    if (isAntiSpamEnabled && isSpam(senderJid)) {
+        return;
+    }
+
+    switch (command) {
+        case '~menu':
+        case '!ayuda':
+        case '!help':
+            // El menú principal ahora se maneja en el archivo futuristicMenu.js
+            await sock.sendMessage(senderJid, { text: 'Usa `~menu` para ver el menú principal.' });
             break;
-        case command === '!estado':
-            const uptime = process.uptime();
-            const uptimeDays = Math.floor(uptime / (3600 * 24));
-            const uptimeHours = Math.floor((uptime % (3600 * 24)) / 3600);
-            const uptimeMinutes = Math.floor((uptime % 3600) / 60);
-            const uptimeSeconds = Math.floor(uptime % 60);
-            const freeMem = (os.freemem() / 1024 / 1024).toFixed(2);
-            const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
-            const statusMessage = `*🤖 Estado del Bot:*\n\n✅ En línea\n⏰ Tiempo en línea: ${uptimeDays}d, ${uptimeHours}h, ${uptimeMinutes}m, ${uptimeSeconds}s\n🧠 Memoria Libre: ${freeMem} MB / ${totalMem} MB\n\nVersión: ${botVersion}\nModo actual: ${botMode.charAt(0).toUpperCase() + botMode.slice(1)}`;
-            await sock.sendMessage(senderJid, { text: statusMessage });
+        case '!estado':
+            // Este comando es solo para el creador
             break;
-        case command === '!dado':
-            const roll = Math.floor(Math.random() * 6) + 1;
-            await sock.sendMessage(senderJid, { text: `🎲 Has lanzado un dado y ha caído en: *${roll}*` });
+        case '!dado':
+            const randomNumber = Math.floor(Math.random() * 6) + 1;
+            await sock.sendMessage(senderJid, { text: `🎲 Lanzaste un dado y salió: *${randomNumber}*` });
             break;
-        case command.startsWith('!8ball'):
+        case '!8ball':
             const responses = [
-                "Sí, definitivamente.", "Es una certeza.", "Sin duda.", "Probablemente.",
-                "No estoy seguro, pregúntame de nuevo.", "Mejor no te digo ahora.",
-                "No cuentes con ello.", "Mi respuesta es no.", "Mis fuentes dicen que no."
+                'Sí, definitivamente.',
+                'Es muy probable.',
+                'Puedes contar con ello.',
+                'Sin duda.',
+                'Probablemente no.',
+                'Lo dudo mucho.',
+                'Mis fuentes dicen que no.',
+                'Mejor no te digo ahora.',
+                'Concéntrate y pregunta de nuevo.'
             ];
-            const randomResponse = responses[Math.floor(Math.random() * responses.length)];
-            await sock.sendMessage(senderJid, { text: `🎱 La bola mágica dice: *${randomResponse}*` });
-            break;
-        default:
+            const response = responses[Math.floor(Math.random() * responses.length)];
+            await sock.sendMessage(senderJid, { text: `🎱 La bola mágica dice: *"${response}"*` });
             break;
     }
 };
 
 module.exports = {
     handleGeneralCommands,
-    sendMenu
+    isSpam
 };
