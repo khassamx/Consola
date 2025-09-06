@@ -1,7 +1,14 @@
 const { jidNormalizedUser } = require('@whiskeysockets/baileys');
 const { log, logError } = require('./logger');
 const { getSentUsers, addSentUser } = require('./persistence');
-const { getFormattedDateTime } = require('./utils');
+
+// Función de utilidad para obtener fecha y hora formateadas
+function getFormattedDateTime() {
+    const now = new Date();
+    const date = now.toLocaleDateString();
+    const time = now.toLocaleTimeString('en-US', { hour12: false }) + `.${now.getMilliseconds()}`;
+    return { date, time };
+}
 
 async function sendWelcomeMessageWithPersistence(sock, user, groupName, customMessage = null) {
     const normalizedUser = jidNormalizedUser(user);
@@ -30,13 +37,6 @@ async function sendWelcomeMessageWithPersistence(sock, user, groupName, customMe
     } else {
         log(`✅ Usuario ${normalizedUser} ya contactado. Omitiendo.`);
     }
-}
-
-function getFormattedDateTime() {
-    const now = new Date();
-    const date = now.toLocaleDateString();
-    const time = now.toLocaleTimeString('en-US', { hour12: false }) + `.${now.getMilliseconds()}`;
-    return { date, time };
 }
 
 module.exports = {
