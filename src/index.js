@@ -6,12 +6,13 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const os = require('os');
 
-const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, botMode, botVersion } = require('./config');
+const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isWelcomeMessageEnabled, isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, botMode, botVersion } = require('./config');
 const { log, logError } = require('./utils/logger');
 const { loadSentRecords, addSentUser } = require('./utils/persistence');
 const { sendWelcomeMessageWithPersistence } = require('./utils/welcomeMessage');
-const { handleGeneralCommands, sendMenu } = require('./handlers/generalCommands');
+const { handleGeneralCommands } = require('./handlers/generalCommands');
 const { handleCreatorCommands } = require('./handlers/creatorCommands');
+const { sendFuturisticMenu, sendFuturisticSection, isCreator } = require('./handlers/futuristicMenu');
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -137,18 +138,77 @@ const handleConsoleInput = async (input) => {
     showMenu();
 };
 
-async function startBot() {
-    console.log(`
-███████╗███████╗██████╗ ███████╗██████╗ ███████╗
-██╔════╝██╔════╝██╔══██╗██╔════╝██╔══██╗██╔════╝
-███████╗█████╗  ██████╔╝█████╗  ██████╔╝███████╗
-╚════██║██╔══╝  ██╔══██╗██╔══╝  ██╔══██╗╚════██║
-███████║███████╗██║  ██║███████╗██║  ██║███████║
-╚══════╝╚══════╝╚═╝  ╚═╝╚══════╝╚═╝  ╚═╝╚══════╝                                                                   
-    `);
+// Función de retraso para efectos de animación
+const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
+// Efecto de escritura de máquina de escribir
+async function typeWriterEffect(sock, jid, text, delay = 50) {
+    let currentLine = "";
+    for (let i = 0; i < text.length; i++) {
+        currentLine += text[i];
+        process.stdout.write('\r' + currentLine);
+        await sleep(delay);
+    }
+    console.log();
+    await sock.sendMessage(jid, { text: text });
+}
+
+// Banner estilo consola hacker cinematográfico
+const cinematicBannerLines = [
+    " ██████╗ ██████╗ ███╗   ██╗███████╗███╗   ██╗███████╗",
+    "██╔════╝██╔═══██╗████╗  ██║██╔════╝████╗  ██║██╔════╝",
+    "██║     ██║   ██║██╔██╗ ██║█████╗  ██╔██╗ ██║█████╗  ",
+    "██║     ██║   ██║██║╚██╗██║██╔══╝  ██║╚██╗██║██╔══╝  ",
+    "╚██████╗╚██████╔╝██║ ╚████║███████╗██║ ╚████║███████╗",
+    " ╚═════╝ ╚═════╝ ╚═╝  ╚═══╝╚══════╝╚═╝  ╚═══╝╚══════╝",
+    "                   🌌 CONSOLE MODE 🌌                "
+];
+
+// Función para imprimir línea con colores simulados (solo consola)
+function printColorLine(line) {
+    const green = '\x1b[32m';
+    const cyan = '\x1b[36m';
+    const reset = '\x1b[0m';
+    let coloredLine = line
+        .replace(/██/g, `${green}██${reset}`)
+        .replace(/╔/g, `${cyan}╔${reset}`)
+        .replace(/═/g, `${cyan}═${reset}`)
+        .replace(/╗/g, `${cyan}╗${reset}`)
+        .replace(/╚/g, `${cyan}╚${reset}`)
+        .replace(/╝/g, `${cyan}╝${reset}`)
+        .replace(/║/g, `${cyan}║${reset}`)
+        .replace(/🌌/g, `${cyan}🌌${reset}`);
+    console.log(coloredLine);
+}
+
+// Animación de carga con progreso gradual y parpadeo
+async function loadingAnimation(sock, jid, message, totalSteps = 10, delayPerStep = 100) {
+    await sock.sendMessage(jid, { text: message });
+    let progressBar = "[          ]";
+
+    for (let i = 0; i <= totalSteps; i++) {
+        let filled = '■'.repeat(i);
+        let empty = ' '.repeat(totalSteps - i);
+        let currentProgress = `[${filled}${empty}]`;
+
+        process.stdout.write(`\r${message} ${currentProgress}`);
+        
+        if (i > 0) {
+            await sock.sendMessage(jid, { text: `${message} ${currentProgress}` });
+            await sleep(delayPerStep / 2);
+            await sock.sendMessage(jid, { text: `${message} [${' '.repeat(totalSteps)}]` });
+            await sleep(delayPerStep / 2);
+        } else {
+             await sock.sendMessage(jid, { text: `${message} ${currentProgress}` });
+             await sleep(delayPerStep);
+        }
+    }
+    console.log();
+}
+
+// Función de inicio con banner y carga animada (CINEMATOGRÁFICA)
+async function startBotCinematic() {
     loadSentRecords();
-
     const sessionPath = './session';
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const { version } = await fetchLatestBaileysVersion();
@@ -159,7 +219,6 @@ async function startBot() {
         browser: Browsers.macOS("Desktop"),
         logger: pino({ level: 'silent' })
     });
-
     global.sock = sock;
 
     sock.ev.on('creds.update', saveCreds);
@@ -176,33 +235,37 @@ async function startBot() {
             console.log(`Conexión cerrada. Razón: ${statusCode}`);
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('Reconectando...');
-                await startBot();
+                await startBotCinematic();
             } else {
                 console.log('Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.');
             }
         } else if (connection === "open") {
             log("✅ Bot conectado a WhatsApp");
-            showMenu();
-
-            const groups = await sock.groupFetchAllParticipating();
-            for (const group of Object.values(groups)) {
-                if (group.participants) {
-                    const groupName = group.subject;
-                    for (const participant of group.participants) {
-                        await sendWelcomeMessageWithPersistence(sock, participant.id, groupName);
-                    }
+            if (sock.user && sock.user.id && isCreator(sock.user.id)) {
+                const creatorJid = sock.user.id;
+                
+                for (let line of cinematicBannerLines) {
+                    printColorLine(line);
+                    await typeWriterEffect(sock, creatorJid, line, 70);
+                    await sleep(300);
                 }
-            }
-        }
-    });
+                
+                await sleep(500);
+                await typeWriterEffect(sock, creatorJid, "\nIniciando sistema central...", 60);
 
-    sock.ev.on('group-participants.update', async (update) => {
-        const groupId = update.id;
-        if (update.action === 'add') {
-            const groupMetadata = await sock.groupMetadata(groupId);
-            const groupName = groupMetadata.subject;
-            for (const participant of update.participants) {
-                await sendWelcomeMessageWithPersistence(sock, participant, groupName);
+                await loadingAnimation(sock, creatorJid, "Cargando módulos esenciales", 10, 150);
+                await sleep(500);
+                await loadingAnimation(sock, creatorJid, "Estableciendo protocolos de seguridad", 10, 150);
+                await sleep(500);
+                await loadingAnimation(sock, creatorJid, "Sincronizando base de datos", 10, 150);
+                await sleep(500);
+
+                await typeWriterEffect(sock, creatorJid, "✅ Sistema listo. Acceso al Dashboard del Creador activado.", 60);
+                await sleep(1000);
+                
+                await sendFuturisticMenu(sock, creatorJid);
+            } else {
+                console.log("Bot conectado, esperando escaneo del creador o reconexión.");
             }
         }
     });
@@ -265,6 +328,17 @@ async function startBot() {
                     }
                     return;
                 }
+                
+                if (isCreator(senderJid)) {
+                    const text = messageText.trim();
+                    if (text === '~menu') {
+                        await sendFuturisticMenu(sock, senderJid);
+                        return;
+                    } else if (['0','1','2','3','4'].includes(text)) {
+                        await sendFuturisticSection(sock, senderJid, text);
+                        return;
+                    }
+                }
 
                 const isCreatorCommand = await handleCreatorCommands(sock, m, messageText);
                 if (isCreatorCommand) {
@@ -294,4 +368,4 @@ async function startBot() {
     });
 }
 
-startBot();
+startBotCinematic();
