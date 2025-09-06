@@ -1,9 +1,12 @@
-const { CREATOR_JID, isAntiLinkEnabled, isWordFilterEnabled, botMode, log, logError } = require('../config');
+const { CREATOR_JID, isAntiLinkEnabled, isWordFilterEnabled, isWelcomeMessageEnabled, botMode } = require('../config');
+const { sendWelcomeMessageWithPersistence } = require('../utils/welcomeMessage');
+const { getSentUsers } = require('../utils/persistence');
 
 const handleCreatorCommands = async (sock, m, messageText) => {
     const senderJid = m.key.remoteJid;
     const isGroup = senderJid.endsWith('@g.us');
     const command = messageText.toLowerCase().trim();
+    const args = messageText.trim().split(' ');
 
     if (senderJid !== CREATOR_JID) {
         return false;
@@ -99,6 +102,51 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 await sock.sendMessage(group.id, { text: `📢 *ANUNCIO DEL CREADOR:*\n\n${announcement}` });
             }
             await sock.sendMessage(senderJid, { text: `✅ Anuncio enviado a ${Object.keys(groups).length} grupos.` });
+            return true;
+        case command.startsWith('.bienvenida'):
+            if (args[1] === 'on') {
+                isWelcomeMessageEnabled = true;
+                await sock.sendMessage(senderJid, { text: '✅ Mensaje de bienvenida activado.' });
+            } else if (args[1] === 'off') {
+                isWelcomeMessageEnabled = false;
+                await sock.sendMessage(senderJid, { text: '❌ Mensaje de bienvenida desactivado.' });
+            } else if (args[1] === 'lista') {
+                const groups = await sock.groupFetchAllParticipating();
+                let listMessage = "Lista de Grupos:\n\n";
+                Object.values(groups).forEach((group, index) => {
+                    listMessage += `${index + 1}. ${group.subject}\n`;
+                });
+                await sock.sendMessage(senderJid, { text: listMessage });
+            } else if (args[1] === 'privados') {
+                const sentCount = getSentUsers().length;
+                await sock.sendMessage(senderJid, { text: `Se han enviado ${sentCount} mensajes de bienvenida en privado hasta ahora.` });
+            } else {
+                await sock.sendMessage(senderJid, { text: 'Uso incorrecto. Formato: `.bienvenida [on/off/lista/privados]`' });
+            }
+            return true;
+        case command.startsWith('.spam'):
+            const groups = await sock.groupFetchAllParticipating();
+            const groupList = Object.values(groups);
+            const groupIndex = parseInt(args[1], 10) - 1;
+            const customMessage = args.slice(2).join(' ');
+
+            if (isNaN(groupIndex) || !groupList[groupIndex] || !customMessage) {
+                await sock.sendMessage(senderJid, { text: 'Uso incorrecto. Formato: `.spam [número de grupo] [mensaje]`' });
+                return true;
+            }
+            
+            const targetGroup = groupList[groupIndex];
+            const participants = targetGroup.participants;
+
+            if (isWelcomeMessageEnabled) {
+                await sock.sendMessage(senderJid, { text: `📢 Enviando mensaje a los miembros de *${targetGroup.subject}*...` });
+                for (const participant of participants) {
+                    await sendWelcomeMessageWithPersistence(sock, participant.id, targetGroup.subject, customMessage);
+                }
+                await sock.sendMessage(senderJid, { text: `✅ Mensaje de spam enviado a todos los miembros de *${targetGroup.subject}*.` });
+            } else {
+                await sock.sendMessage(senderJid, { text: '❌ El sistema de bienvenida está desactivado. Usa `.bienvenida on` para activarlo.' });
+            }
             return true;
         default:
             return false;
