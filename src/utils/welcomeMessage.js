@@ -3,13 +3,19 @@ const { log, logError } = require('./logger');
 const { getSentUsers, addSentUser } = require('./persistence');
 const { getFormattedDateTime } = require('./utils');
 
-async function sendWelcomeMessageWithPersistence(sock, user, groupName) {
+async function sendWelcomeMessageWithPersistence(sock, user, groupName, customMessage = null) {
     const normalizedUser = jidNormalizedUser(user);
     if (!getSentUsers().includes(normalizedUser)) {
         try {
             const { date, time } = getFormattedDateTime();
-            const message = `
-Texto::::
+            const message = customMessage || `
+╔═══════════════════╗
+║       🤖 SUBBOT       ║
+╠═══════════════════╣
+║ ¡Hola! Soy tu Subbot. ║
+║ Puedes usar mis comandos: ║
+║       .help           ║
+╠═══════════════════╣
 ║ 👥 Grupo: ${groupName}
 ║ 📅 Fecha: ${date}
 ║ ⏰ Hora: ${time}
