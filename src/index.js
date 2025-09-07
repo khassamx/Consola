@@ -32,7 +32,7 @@ if (!fs.existsSync('./session')) {
     fs.mkdirSync('./session')
 }
 
-const showMenu = () => {
+const showMenu = (sock) => {
     console.log(`\n
 ----------------------------------------
 |       🤖 MENÚ DE CONSOLA 🤖        |
@@ -45,14 +45,13 @@ const showMenu = () => {
 | 6. Salir                           |
 ----------------------------------------
 `);
-    rl.question('Selecciona una opción: ', handleConsoleInput);
+    rl.question('Selecciona una opción: ', (input) => handleConsoleInput(input, sock));
 };
 
-const handleConsoleInput = async (input) => {
-    const sock = global.sock;
+const handleConsoleInput = async (input, sock) => {
     if (!sock) {
-        console.log('❌ El bot no está conectado. Esperando conexión...');
-        showMenu();
+        log(sock, '❌ El bot no está conectado. Esperando conexión...');
+        showMenu(sock);
         return;
     }
 
@@ -63,9 +62,9 @@ const handleConsoleInput = async (input) => {
             const uptimeHours = Math.floor((uptime % (3600 * 24)) / 3600);
             const uptimeMinutes = Math.floor((uptime % 3600) / 60);
             const uptimeSeconds = Math.floor(uptime % 60);
-            const freeMem = (os.freemem() / 1024 / 1024).toFixed(2);
+            const freeMem = (os.freemem() / 1204 / 1024).toFixed(2);
             const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
-            console.log(`
+            log(sock, `
 ✅ Estado del Bot:
   - En línea: Sí
   - Tiempo de actividad: ${uptimeDays}d, ${uptimeHours}h, ${uptimeMinutes}m, ${uptimeSeconds}s
@@ -75,14 +74,14 @@ const handleConsoleInput = async (input) => {
             `);
             break;
         case '2':
-            console.log('\n🎟️ Tickets Abiertos:');
+            log(sock, '\n🎟️ Tickets Abiertos:');
             const openTickets = Object.values(tickets).filter(t => t.status === 'open');
             if (openTickets.length > 0) {
                 openTickets.forEach(t => {
-                    console.log(`  - ID: ${t.id}, Nombre: ${t.name}`);
+                    log(sock, `  - ID: ${t.id}, Nombre: ${t.name}`);
                 });
             } else {
-                console.log('  - No hay tickets abiertos.');
+                log(sock, '  - No hay tickets abiertos.');
             }
             break;
         case '3':
@@ -92,23 +91,23 @@ const handleConsoleInput = async (input) => {
                 if (ticketToClose) {
                     const [jid, ticket] = ticketToClose;
                     ticket.status = 'closed';
-                    console.log(`✅ Ticket ${ticketId} cerrado.`);
+                    log(sock, `✅ Ticket ${ticketId} cerrado.`);
                     sock.sendMessage(jid, { text: 'Su ticket ha sido cerrado. Si necesita ayuda adicional, por favor, abra uno nuevo.' });
                 } else {
-                    console.log(`❌ No se encontró ningún ticket con el ID ${id}.`);
+                    log(sock, `❌ No se encontró ningún ticket con el ID ${id}.`);
                 }
-                showMenu();
+                showMenu(sock);
             });
             return;
         case '4':
             rl.question('Ingresa el nuevo modo (activo, silencioso, fiesta): ', async (mode) => {
                 if (['activo', 'silencioso', 'fiesta'].includes(mode)) {
                     botMode = mode;
-                    console.log(`✅ Modo del bot cambiado a: *${mode.charAt(0).toUpperCase() + mode.slice(1)}*.`);
+                    log(sock, `✅ Modo del bot cambiado a: *${mode.charAt(0).toUpperCase() + mode.slice(1)}*.`);
                 } else {
                     await sock.sendMessage(senderJid, { text: '❌ Modo incorrecto. Modos disponibles: `activo`, `silencioso`, `fiesta`.' });
                 }
-                showMenu();
+                showMenu(sock);
             });
             return;
         case '5':
@@ -118,25 +117,25 @@ const handleConsoleInput = async (input) => {
                 if (targetJid && msgBody) {
                     try {
                         await sock.sendMessage(targetJid, { text: msgBody });
-                        log(`Mensaje enviado a ${targetJid} desde la consola.`);
+                        log(sock, `Mensaje enviado a ${targetJid} desde la consola.`);
                     } catch (e) {
-                        logError(`Error al enviar mensaje desde la consola: ${e.message}`);
+                        logError(sock, `Error al enviar mensaje desde la consola: ${e.message}`);
                     }
                 } else {
-                    console.log('❌ Uso incorrecto. Formato: JID mensaje');
+                    log(sock, '❌ Uso incorrecto. Formato: JID mensaje');
                 }
-                showMenu();
+                showMenu(sock);
             });
             return;
         case '6':
-            console.log('Saliendo de la consola interactiva.');
+            log(sock, 'Saliendo de la consola interactiva.');
             rl.close();
             return;
         default:
-            console.log('❌ Opción no válida. Por favor, selecciona una opción del 1 al 6.');
+            log(sock, '❌ Opción no válida. Por favor, selecciona una opción del 1 al 6.');
             break;
     }
-    showMenu();
+    showMenu(sock);
 };
 
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
@@ -220,20 +219,20 @@ async function startBotCinematic(skipQr = false) {
         const { connection, qr, lastDisconnect } = update;
 
         if (qr && !skipQr) {
-            log("📌 Escanea este QR con tu WhatsApp:");
+            log(sock, "📌 Escanea este QR con tu WhatsApp:");
             qrcode.generate(qr, { small: true });
         }
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            console.log(`Conexión cerrada. Razón: ${statusCode}`);
+            log(sock, `Conexión cerrada. Razón: ${statusCode}`);
             if (statusCode !== DisconnectReason.loggedOut) {
-                console.log('Reconectando...');
+                log(sock, 'Reconectando...');
                 await startBotCinematic(skipQr);
             } else {
-                console.log('Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.');
+                log(sock, 'Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.');
             }
         } else if (connection === "open") {
-            log("✅ Bot conectado a WhatsApp");
+            log(sock, "✅ Bot conectado a WhatsApp");
             if (sock.user && sock.user.id && isCreator(sock.user.id)) {
                 const creatorJid = sock.user.id;
                 
@@ -258,7 +257,7 @@ async function startBotCinematic(skipQr = false) {
                 
                 await sendFuturisticMenu(sock, creatorJid);
             } else {
-                console.log("Bot conectado, esperando escaneo del creador o reconexión.");
+                log(sock, "Bot conectado, esperando escaneo del creador o reconexión.");
             }
         }
     });
@@ -268,9 +267,9 @@ async function startBotCinematic(skipQr = false) {
         const message = '¡Buenos días! Este es un recordatorio diario. ¡Que tengas un gran día!';
         try {
             await sock.sendMessage(groupJid, { text: message });
-            log(`Mensaje diario enviado a [${groupJid}]`);
+            log(sock, `Mensaje diario enviado a [${groupJid}]`);
         } catch (e) {
-            logError(`Error al enviar mensaje programado: ${e.message}`);
+            logError(sock, `Error al enviar mensaje programado: ${e.message}`);
         }
     });
 
@@ -283,7 +282,7 @@ async function startBotCinematic(skipQr = false) {
                 const senderJid = deletedMsgKey.remoteJid;
                 const participantJid = deletedMsgKey.participant || senderJid;
                 const senderName = m.pushName || participantJid.split('@')[0];
-                log(`🗑️ ALERTA: Mensaje eliminado por ${senderName} en [${senderJid}].`);
+                log(sock, `🗑️ ALERTA: Mensaje eliminado por ${senderName} en [${senderJid}].`);
                 return;
             }
 
@@ -320,7 +319,7 @@ async function startBotCinematic(skipQr = false) {
                         await sock.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
                         await sock.sendMessage(senderJid, { delete: m.key });
                         await sock.sendMessage(senderJid, { text: `⚠️ Usuario expulsado. El prefijo de su número (*+${countryCode}*) no está permitido.` });
-                        log(`🚫 Filtro de Prefijos: Usuario con código de país '${countryCode}' expulsado y su mensaje eliminado de [${senderJid}].`);
+                        log(sock, `🚫 Filtro de Prefijos: Usuario con código de país '${countryCode}' expulsado y su mensaje eliminado de [${senderJid}].`);
                         return;
                     }
                 }
@@ -336,12 +335,12 @@ async function startBotCinematic(skipQr = false) {
                             await sock.sendMessage(senderJid, { delete: m.key });
                             await sock.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
                             await sock.sendMessage(senderJid, { text: `❌ Enlace detectado. El usuario ha sido expulsado por enviar un link.` });
-                            log(`🚫 Anti-Link: Mensaje con enlace de ${senderName} eliminado en [${senderJid}]. Usuario expulsado.`);
+                            log(sock, `🚫 Anti-Link: Mensaje con enlace de ${senderName} eliminado en [${senderJid}]. Usuario expulsado.`);
                         } else {
-                            log(`ℹ️ Anti-Link: Enlace ignorado, el remitente es un administrador.`);
+                            log(sock, `ℹ️ Anti-Link: Enlace ignorado, el remitente es un administrador.`);
                         }
                     } catch (e) {
-                        logError(`Error en Anti-Link: ${e.message}`);
+                        logError(sock, `Error en Anti-Link: ${e.message}`);
                     }
                     return;
                 }
@@ -350,7 +349,7 @@ async function startBotCinematic(skipQr = false) {
                     for (const word of OFFENSIVE_WORDS) {
                         if (messageText.toLowerCase().includes(word.toLowerCase())) {
                             await sock.sendMessage(senderJid, { text: `⚠️ Por favor, mantén un lenguaje respetuoso. El uso de palabras ofensivas no está permitido.` });
-                            log(`😠 Alerta: Palabra ofensiva detectada de ${senderName} en [${senderJid}]`);
+                            log(sock, `😠 Alerta: Palabra ofensiva detectada de ${senderName} en [${senderJid}]`);
                             return;
                         }
                     }
@@ -386,12 +385,12 @@ async function startBotCinematic(skipQr = false) {
                         ticketCounter = (ticketCounter % 900) + 1;
                         tickets[senderJid] = { id: ticketCounter, status: 'open', name: senderName };
                         await sock.sendMessage(senderJid, { text: `Ticket abierto. ID: ${tickets[senderJid].id}` });
-                        log(`🎟️ Ticket: Se abrió un ticket para [${senderJid}]`);
+                        log(sock, `🎟️ Ticket: Se abrió un ticket para [${senderJid}]`);
                     }
                 } else if (messageText.toLowerCase().trim() === '!cerrar' && tickets[senderJid] && tickets[senderJid].status === 'open' && !isGroup) {
                     tickets[senderJid].status = 'closed';
                     await sock.sendMessage(senderJid, { text: "Su ticket ha sido cerrado. ¡Gracias por usar nuestro servicio!" });
-                    log(`🎟️ Ticket: Se cerró un ticket para [${senderJid}]`);
+                    log(sock, `🎟️ Ticket: Se cerró un ticket para [${senderJid}]`);
                 } else if (messageText.toLowerCase().trim() === '!cerrar' && !tickets[senderJid] && !isGroup) {
                     await sock.sendMessage(senderJid, { text: "No tienes un ticket abierto para cerrar." });
                 }
@@ -413,9 +412,9 @@ async function main() {
         await startBotCinematic(false);
         rl.question(`\n${'\x1b[32m'}¿Deseas empezar? (Y/n):${'\x1b[0m'} `, async (answer) => {
             if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-                log('Iniciando...');
+                log(global.sock, 'Iniciando...');
             } else {
-                log('Cerrando bot. ¡Hasta pronto!');
+                log(global.sock, 'Cerrando bot. ¡Hasta pronto!');
                 process.exit();
             }
         });
