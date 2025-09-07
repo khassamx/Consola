@@ -7,13 +7,12 @@ const os = require('os');
 const chalk = require('chalk');
 
 const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isAntiSpamEnabled, botMode, botVersion, isAntiPrefixEnabled, arabicPrefixes, isCreator } = require('./config');
-const { log, logError } = require('./utils/logger');
+const { log, logError, setSocket } = require('./utils/logger');
 const { handleGeneralCommands } = require('./handlers/generalCommands');
 const { handleCreatorCommands } = require('./handlers/creatorCommands');
 const { sendFuturisticMenu, sendFuturisticSection } = require('./handlers/futuristicMenu');
 const { sendUserMenu } = require('./handlers/userMenu');
 
-// Dimensiones para la animación
 const width = 70;
 const height = 20;
 
@@ -142,6 +141,7 @@ async function connectToWhatsApp(skipQr = false) {
         logger: pino({ level: 'silent' })
     });
     global.sock = conn;
+    setSocket(conn);
 
     conn.ev.on('creds.update', saveCreds);
     conn.ev.on("connection.update", (update) => {
