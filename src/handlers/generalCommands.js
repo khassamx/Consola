@@ -1,9 +1,7 @@
-const { isAntiSpamEnabled, ANTI_SPAM_THRESHOLD } = require('../config');
+const { isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, COMMAND_STATUS } = require('../config');
 
-// Mapa para guardar el último mensaje de cada usuario y prevenir spam
 const lastMessageTimestamps = new Map();
 
-// Función que verifica si un mensaje es spam
 const isSpam = (senderJid) => {
     const now = Date.now();
     const lastMessageTime = lastMessageTimestamps.get(senderJid) || 0;
@@ -17,7 +15,6 @@ const isSpam = (senderJid) => {
     return false;
 };
 
-// Función que maneja los comandos generales del bot
 const handleGeneralCommands = async (sock, m, messageText) => {
     const senderJid = m.key.remoteJid;
     const command = messageText.toLowerCase().trim();
@@ -27,20 +24,13 @@ const handleGeneralCommands = async (sock, m, messageText) => {
     }
 
     switch (command) {
-        case '~menu':
-        case '!ayuda':
-        case '!help':
-            // El menú principal ahora se maneja en el archivo futuristicMenu.js
-            await sock.sendMessage(senderJid, { text: 'Usa `~menu` para ver el menú principal.' });
-            break;
-        case '!estado':
-            // Este comando es solo para el creador
-            break;
         case '!dado':
+            if (!COMMAND_STATUS['dado']) return;
             const randomNumber = Math.floor(Math.random() * 6) + 1;
             await sock.sendMessage(senderJid, { text: `🎲 Lanzaste un dado y salió: *${randomNumber}*` });
             break;
         case '!8ball':
+            if (!COMMAND_STATUS['8ball']) return;
             const responses = [
                 'Sí, definitivamente.',
                 'Es muy probable.',
@@ -54,6 +44,17 @@ const handleGeneralCommands = async (sock, m, messageText) => {
             ];
             const response = responses[Math.floor(Math.random() * responses.length)];
             await sock.sendMessage(senderJid, { text: `🎱 La bola mágica dice: *"${response}"*` });
+            break;
+        case '!abrir':
+            if (!COMMAND_STATUS['abrir']) return;
+            // La lógica de tickets está en index.js, pero la verificación se hace aquí.
+            break;
+        case '!cerrar':
+            if (!COMMAND_STATUS['cerrar']) return;
+            // La lógica de tickets está en index.js, pero la verificación se hace aquí.
+            break;
+        default:
+            // No hacer nada si el comando no está en la lista.
             break;
     }
 };
