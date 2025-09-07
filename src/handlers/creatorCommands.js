@@ -176,17 +176,16 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 await sock.sendMessage(senderJid, { text: '❌ El comando `.spam` está desactivado.' });
                 return true;
             }
-            const groups = await sock.groupFetchAllParticipating();
-            const groupList = Object.values(groups);
+            const groupList = await sock.groupFetchAllParticipating(); // CORREGIDO: Renombrado a groupList
             const groupIndex = parseInt(args[1], 10) - 1;
             const customMessage = args.slice(2).join(' ');
 
-            if (isNaN(groupIndex) || !groupList[groupIndex] || !customMessage) {
+            if (isNaN(groupIndex) || !Object.values(groupList)[groupIndex] || !customMessage) {
                 await sock.sendMessage(senderJid, { text: 'Uso incorrecto. Formato: `.spam [número de grupo] [mensaje]`' });
                 return true;
             }
             
-            const targetGroup = groupList[groupIndex];
+            const targetGroup = Object.values(groupList)[groupIndex];
             const participants = targetGroup.participants;
 
             if (isWelcomeMessageEnabled) {
