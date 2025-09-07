@@ -199,19 +199,20 @@ async function loadingAnimation(message, totalSteps = 50, delayPerStep = 100) {
     console.log();
 }
 
-async function startBotCinematic(skipQr = false) {
-    loadSentRecords();
+let sock = null;
+let qrCodeData = null;
+
+async function connectToWhatsApp(skipQr) {
     const sessionPath = './session';
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const { version } = await fetchLatestBaileysVersion();
 
-    const sock = makeWASocket({
+    sock = makeWASocket({
         version,
         auth: state,
         browser: Browsers.macOS("Desktop"),
         logger: pino({ level: 'silent' })
     });
-    global.sock = sock;
 
     sock.ev.on('creds.update', saveCreds);
 
@@ -219,45 +220,28 @@ async function startBotCinematic(skipQr = false) {
         const { connection, qr, lastDisconnect } = update;
 
         if (qr && !skipQr) {
-            log(sock, "📌 Escanea este QR con tu WhatsApp:");
-            qrcode.generate(qr, { small: true });
+            qrCodeData = qr;
         }
+
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            log(sock, `Conexión cerrada. Razón: ${statusCode}`);
+            log(null, `Conexión cerrada. Razón: ${statusCode}`);
             if (statusCode !== DisconnectReason.loggedOut) {
-                log(sock, 'Reconectando...');
-                await startBotCinematic(skipQr);
+                log(null, 'Reconectando...');
+                await connectToWhatsApp(skipQr);
             } else {
-                log(sock, 'Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.');
+                log(null, 'Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.');
             }
         } else if (connection === "open") {
-            log(sock, "✅ Bot conectado a WhatsApp");
+            log(null, "✅ Bot conectado a WhatsApp");
             if (sock.user && sock.user.id && isCreator(sock.user.id)) {
                 const creatorJid = sock.user.id;
                 
-                for (let line of cinematicBannerLines) {
-                    printColorLine(line);
-                    await typeWriterEffect(line, 5);
-                    await sleep(30);
-                }
-                
-                await sleep(500);
-                await typeWriterEffect("\nIniciando sistema central...", 60);
+                await showCinematicIntro();
 
-                await loadingAnimation("Cargando módulos esenciales", 10, 150);
-                await sleep(500);
-                await loadingAnimation("Estableciendo protocolos de seguridad", 10, 150);
-                await sleep(500);
-                await loadingAnimation("Sincronizando base de datos", 10, 150);
-                await sleep(500);
-
-                await typeWriterEffect("✅ Sistema listo. Acceso al Dashboard del Creador activado.", 60);
-                await sleep(1000);
-                
                 await sendFuturisticMenu(sock, creatorJid);
             } else {
-                log(sock, "Bot conectado, esperando escaneo del creador o reconexión.");
+                log(null, "Bot conectado, esperando escaneo del creador o reconexión.");
             }
         }
     });
@@ -267,14 +251,14 @@ async function startBotCinematic(skipQr = false) {
         const message = '¡Buenos días! Este es un recordatorio diario. ¡Que tengas un gran día!';
         try {
             await sock.sendMessage(groupJid, { text: message });
-            log(sock, `Mensaje diario enviado a [${groupJid}]`);
+            log(null, `Mensaje diario enviado a [${groupJid}]`);
         } catch (e) {
-            logError(sock, `Error al enviar mensaje programado: ${e.message}`);
+            logError(null, `Error al enviar mensaje programado: ${e.message}`);
         }
     });
 
     sock.ev.on("messages.upsert", async ({ messages, type }) => {
-        if (type === "notify") {
+        if (type === "notify" && sock) {
             const m = messages[0];
 
             if (m.message?.protocolMessage?.type === 'REVOKE') {
@@ -292,27 +276,26 @@ async function startBotCinematic(skipQr = false) {
                 const messageText = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
                 const senderParticipant = m.key.participant || m.key.remoteJid;
                 const senderName = m.pushName || senderParticipant.split('@')[0];
-                
+
                 if (isCreator(senderJid) && !isGroup && messageText.trim() === '~consola-status') {
-                     const uptime = process.uptime();
-                     const uptimeDays = Math.floor(uptime / (3600 * 24));
-                     const uptimeHours = Math.floor((uptime % (3600 * 24)) / 3600);
-                     const uptimeMinutes = Math.floor((uptime % 3600) / 60);
-                     const uptimeSeconds = Math.floor(uptime % 60);
-                     const freeMem = (os.freemem() / 1024 / 1024).toFixed(2);
-                     const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
-                     await sock.sendMessage(senderJid, { text: `
+                    const uptime = process.uptime();
+                    const uptimeDays = Math.floor(uptime / (3600 * 24));
+                    const uptimeHours = Math.floor((uptime % (3600 * 24)) / 3600);
+                    const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+                    const uptimeSeconds = Math.floor(uptime % 60);
+                    const freeMem = (os.freemem() / 1024 / 1024).toFixed(2);
+                    const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
+                    await sock.sendMessage(senderJid, { text: `
 *✅ Estado del Bot (Consola Remota)*
   - En línea: Sí
   - Tiempo de actividad: ${uptimeDays}d, ${uptimeHours}h, ${uptimeMinutes}m, ${uptimeSeconds}s
   - Memoria: ${freeMem} MB / ${totalMem} MB
   - Versión: ${botVersion}
   - Modo: ${botMode.charAt(0).toUpperCase() + botMode.slice(1)}
-                     `});
-                     return;
+                    `});
+                    return;
                 }
-                
-                // FILTRO DE PREFIJOS
+
                 if (isAntiPrefixEnabled && isGroup) {
                     const countryCode = senderParticipant.split('@')[0].substring(0, 3);
                     if (arabicPrefixes.includes(countryCode)) {
@@ -324,7 +307,6 @@ async function startBotCinematic(skipQr = false) {
                     }
                 }
 
-                // ANTI-LINK ESTRICTO
                 const linkRegex = /(https?:\/\/|www\.)[^\s]+/gi;
                 if (isAntiLinkEnabled && isGroup && messageText.match(linkRegex)) {
                     try {
@@ -399,25 +381,54 @@ async function startBotCinematic(skipQr = false) {
     });
 }
 
-// Nueva función principal para gestionar el flujo de inicio
+async function showCinematicIntro() {
+    for (let line of cinematicBannerLines) {
+        printColorLine(line);
+        await typeWriterEffect(line, 5);
+        await sleep(30);
+    }
+    
+    await sleep(500);
+    await typeWriterEffect("\nIniciando sistema central...", 60);
+
+    await loadingAnimation("Cargando módulos esenciales", 10, 150);
+    await sleep(500);
+    await loadingAnimation("Estableciendo protocolos de seguridad", 10, 150);
+    await sleep(500);
+    await loadingAnimation("Sincronizando base de datos", 10, 150);
+    await sleep(500);
+
+    await typeWriterEffect("✅ Sistema listo. Acceso al Dashboard del Creador activado.", 60);
+    await sleep(1000);
+}
+
+// Nueva función principal que controla el flujo de inicio
 async function main() {
     console.clear();
     const sessionExists = fs.existsSync('./session/creds.json');
     
-    // Si la sesión existe, reproduce la película y se conecta automáticamente
     if (sessionExists) {
-        await startBotCinematic(true);
+        log(null, '✅ Sesión encontrada. Iniciando conexión automáticamente...');
+        await connectToWhatsApp(true);
     } else {
-        // Si no hay sesión, reproduce la película y luego pide el QR
-        await startBotCinematic(false);
-        rl.question(`\n${'\x1b[32m'}¿Deseas empezar? (Y/n):${'\x1b[0m'} `, async (answer) => {
-            if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-                log(global.sock, 'Iniciando...');
-            } else {
-                log(global.sock, 'Cerrando bot. ¡Hasta pronto!');
-                process.exit();
+        log(null, 'ℹ️ No se encontró sesión. Se requiere escanear el código QR.');
+        await connectToWhatsApp(false);
+
+        // Esperar a que el QR se genere y preguntar al usuario
+        const intervalId = setInterval(() => {
+            if (qrCodeData) {
+                clearInterval(intervalId);
+                rl.question(`\n${'\x1b[32m'}¿Deseas empezar? (Y/n):${'\x1b[0m'} `, async (answer) => {
+                    if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+                        log(null, '📌 Escaneando código QR...');
+                        qrcode.generate(qrCodeData, { small: true });
+                    } else {
+                        log(null, 'Cerrando bot. ¡Hasta pronto!');
+                        process.exit();
+                    }
+                });
             }
-        });
+        }, 100);
     }
 }
 
