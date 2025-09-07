@@ -139,7 +139,6 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 await sock.sendMessage(senderJid, { text: '❌ El comando `.anuncio` está desactivado.' });
                 return true;
             }
-            const announcement = messageText.split(' ').slice(1).join(' ');
             const groups = await sock.groupFetchAllParticipating();
             for (const group of Object.values(groups)) {
                 await sock.sendMessage(group.id, { text: `📢 *ANUNCIO DEL CREADOR:*\n\n${announcement}` });
@@ -158,9 +157,9 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 isWelcomeMessageEnabled = false;
                 await sock.sendMessage(senderJid, { text: '❌ Mensaje de bienvenida desactivado.' });
             } else if (args[1] === 'lista') {
-                const groups = await sock.groupFetchAllParticipating();
+                const allGroups = await sock.groupFetchAllParticipating();
                 let listMessage = "Lista de Grupos:\n\n";
-                Object.values(groups).forEach((group, index) => {
+                Object.values(allGroups).forEach((group, index) => {
                     listMessage += `${index + 1}. ${group.subject}\n`;
                 });
                 await sock.sendMessage(senderJid, { text: listMessage });
@@ -176,7 +175,7 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 await sock.sendMessage(senderJid, { text: '❌ El comando `.spam` está desactivado.' });
                 return true;
             }
-            const groupList = await sock.groupFetchAllParticipating(); // CORREGIDO: Renombrado a groupList
+            const groupList = await sock.groupFetchAllParticipating();
             const groupIndex = parseInt(args[1], 10) - 1;
             const customMessage = args.slice(2).join(' ');
 
