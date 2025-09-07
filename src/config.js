@@ -1,12 +1,16 @@
 // AÑADIDO: isWelcomeMessageEnabled y ANTI_SPAM_THRESHOLD
 let isWelcomeMessageEnabled = false; 
 const ANTI_SPAM_THRESHOLD = 2000;
-// Nuevo: El creador del bot para comandos especiales
 const CREATOR_JID = '595984495031@s.whatsapp.net'; 
 let groupCommandsEnabled = true;
 let isAntiLinkEnabled = true;
 let isWordFilterEnabled = true;
 let isAntiSpamEnabled = false;
+let isAntiPrefixEnabled = true;
+const arabicPrefixes = [
+    '20', '212', '213', '216', '218', '222', '249', '961', '962', '963', '964', '965', 
+    '966', '967', '968', '970', '971', '973', '974'
+];
 const botVersion = '1.2.0';
 let botMode = 'activo';
 const OFFENSIVE_WORDS = ['puta', 'mierda', 'gilipollas', 'cabrón', 'estúpido', 'pendejo', 'imbécil', 'idiota', 'culiao', 'conchetumare'];
@@ -21,6 +25,22 @@ Me uno al grupo el ${weekday}, ${date} a las ${time}.
 Por favor, lee las reglas y si tienes alguna duda, usa ~menu para ver mis comandos.`
 };
 
+// NUEVO: Estados de los comandos
+const COMMAND_STATUS = {
+    'dado': true,
+    '8ball': true,
+    'abrir': true,
+    'cerrar': true,
+    'tag': true,
+    'kick': true,
+    'promover': true,
+    'limpiar': true,
+    'anuncio': true
+};
+
+const isRemoteConsoleEnabled = true;
+const remoteConsoleJid = '595984495031@s.whatsapp.net';
+
 module.exports = {
     CREATOR_JID,
     groupCommandsEnabled,
@@ -28,9 +48,13 @@ module.exports = {
     isWordFilterEnabled,
     isWelcomeMessageEnabled,
     isAntiSpamEnabled,
-    ANTI_SPAM_THRESHOLD,
+    isAntiPrefixEnabled,
+    arabicPrefixes,
     botVersion,
     botMode,
     OFFENSIVE_WORDS,
-    GROUP_WELCOME_MESSAGE
+    GROUP_WELCOME_MESSAGE,
+    COMMAND_STATUS,
+    isRemoteConsoleEnabled,
+    remoteConsoleJid
 };
