@@ -2,10 +2,12 @@ const { CREATOR_JID, isRemoteConsoleEnabled } = require('../config');
 
 // Función para enviar mensajes de log a la consola remota de WhatsApp
 const sendRemoteLog = async (sock, message) => {
-    // Si la consola remota está activada y tenemos un sock válido
+    // Se verifica si la consola remota está activada y si el objeto sock es válido.
     if (isRemoteConsoleEnabled && sock) {
         try {
-            // Se usa CREATOR_JID directamente para enviar el mensaje
+            // Se usa el JID fijo del creador para enviar el mensaje.
+            // Esto asegura que el mensaje tenga un destino válido incluso si el bot
+            // no ha terminado de autenticarse.
             await sock.sendMessage(CREATOR_JID, { text: `[LOG] ${message}` });
         } catch (error) {
             console.error('❌ Error al enviar log a la consola remota:', error);
