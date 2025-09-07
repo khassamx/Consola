@@ -1,115 +1,133 @@
-const { CREATOR_JID, isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, isWelcomeMessageEnabled, botMode, isAntiLinkEnabled, isWordFilterEnabled } = require('../config');
-const { getSentUsers } = require('../utils/persistence');
+const { groupCommandsEnabled, isAntiLinkEnabled, isWordFilterEnabled, isAntiSpamEnabled, isAntiPrefixEnabled } = require('../config');
 
-// Menú ultra futurista estilo terminal hacker animado
 const sendFuturisticMenu = async (sock, jid) => {
-    // Títulos animados
-    const titles = [
-        '🌌👑 DASHBOARD DEL CREADOR – HACKER MODE 👑🌌',
-        '🌌⚡ CARGANDO MENÚ PRINCIPAL… ⚡🌌',
-        '🌌✅ MENÚ LISTO PARA USO 👑🌌'
+    const sections = [
+        {
+            title: "⚙️ AJUSTES DEL BOT",
+            rows: [
+                {
+                    title: "Comandos de Grupo",
+                    rowId: "1",
+                    description: `Estado: ${groupCommandsEnabled ? 'ACTIVO' : 'INACTIVO'}`
+                },
+                {
+                    title: "Anti-Link",
+                    rowId: "2",
+                    description: `Estado: ${isAntiLinkEnabled ? 'ACTIVO' : 'INACTIVO'}`
+                },
+                {
+                    title: "Filtro de Palabras",
+                    rowId: "3",
+                    description: `Estado: ${isWordFilterEnabled ? 'ACTIVO' : 'INACTIVO'}`
+                },
+                {
+                    title: "Anti-Spam",
+                    rowId: "4",
+                    description: `Estado: ${isAntiSpamEnabled ? 'ACTIVO' : 'INACTIVO'}`
+                },
+                {
+                    title: "Anti-Prefijo",
+                    rowId: "5",
+                    description: `Estado: ${isAntiPrefixEnabled ? 'ACTIVO' : 'INACTIVO'}`
+                }
+            ]
+        }
     ];
 
-    for (let title of titles) {
-        await sock.sendMessage(jid, { text: `\`\`\`${title}\`\`\`` });
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
+    const listMessage = {
+        text: "Menú de Configuración Avanzada",
+        footer: "Selecciona una opción para ver más detalles.",
+        buttonText: "Ver Opciones",
+        sections
+    };
 
-    // Efecto de “carga” con puntos suspensivos
-    const loading = ['[■□□□□□□□□□]', '[■■■□□□□□□□]', '[■■■■■□□□□□]', '[■■■■■■■■□□]', '[■■■■■■■■■■]'];
-    for (let frame of loading) {
-        await sock.sendMessage(jid, { text: `Cargando menú ${frame}` });
-        await new Promise(resolve => setTimeout(resolve, 300));
-    }
-
-    // Menú principal con efecto de “scrolling línea por línea”
-    const menuLines = [
-        '🔹 NAVEGACIÓN PRINCIPAL:',
-        '────────────────────────────',
-        '1️⃣  ⚙️ Administración',
-        '2️⃣  🎊 Bienvenida & Spam',
-        '3️⃣  🛠️ Modulación & Seguridad',
-        '4️⃣  ℹ️ Información / Ayuda',
-        '0️⃣  ❌ Salir',
-        '',
-        '💡 Escribe el número de la sección que quieras abrir.'
-    ];
-
-    for (let line of menuLines) {
-        await sock.sendMessage(jid, { text: line });
-        await new Promise(resolve => setTimeout(resolve, 150));
-    }
+    await sock.sendMessage(jid, listMessage);
 };
 
-// Función para enviar secciones con efecto scrolling animado
-const sendFuturisticSection = async (sock, jid, option) => {
-    let lines = [];
-    switch(option) {
-        case '1':
-            lines = [
-                '┏━━━━━━━━━━━━━━━━━━━━━━┓',
-                '┃ ⚙️ ADMINISTRACIÓN ┃',
-                '┗━━━━━━━━━━━━━━━━━━━━━━┛',
-                `🟢 .on / .off ➤ Comandos de grupo: ${groupCommandsEnabled ? 'ACTIVO' : 'INACTIVO'}`,
-                `🟡 .modo [activo/silencioso/fiesta] ➤ Modo actual: ${botMode}`,
-                '✉️ .e [número] [mensaje] ➤ Enviar mensaje a un número específico',
-                '🗑️ .limpiar [número] ➤ Eliminar mensajes en el chat',
-                '📢 .anuncio [mensaje] ➤ Enviar mensaje a todos los grupos'
-            ];
+const sendFuturisticSection = async (sock, jid, sectionId) => {
+    let text = "";
+    let footer = "Escribe otro número para regresar al menú principal.";
+    
+    switch (sectionId) {
+        case "1":
+            text = `
+            *🟢 Comandos de Grupo*
+
+            Permite habilitar o deshabilitar comandos en grupos.
+            
+            *Estado Actual:* ${groupCommandsEnabled ? 'ACTIVO' : 'INACTIVO'}
+            
+            *Comandos:*
+            🟢 .on ➤ Habilita los comandos en grupos
+            🔴 .off ➤ Deshabilita los comandos en grupos
+            `;
             break;
-        case '2':
-            const sentCount = getSentUsers().length;
-            lines = [
-                '┏━━━━━━━━━━━━━━━━━━━━━━┓',
-                '┃ 🎊 BIENVENIDA & SPAM ┃',
-                '┗━━━━━━━━━━━━━━━━━━━━━━┛',
-                `👋 .bienvenida [on/off] ➤ Sistema: ${isWelcomeMessageEnabled ? 'ACTIVO' : 'INACTIVO'}`,
-                '📋 .bienvenida lista ➤ Ver lista de grupos',
-                `📩 .bienvenida privados ➤ Mensajes enviados: ${sentCount}`,
-                '⚡ .spam [número] [mensaje] ➤ Enviar mensaje a los miembros de un grupo'
-            ];
+        case "2":
+            text = `
+            *🟢 Anti-Link*
+
+            Detecta y elimina mensajes que contienen enlaces de invitación a grupos de WhatsApp.
+            
+            *Estado Actual:* ${isAntiLinkEnabled ? 'ACTIVO' : 'INACTIVO'}
+            
+            *Comandos:*
+            🟢 .antilink on ➤ Habilita el Anti-Link
+            🔴 .antilink off ➤ Deshabilita el Anti-Link
+            `;
             break;
-        case '3':
-            lines = [
-                '┏━━━━━━━━━━━━━━━━━━━━━━┓',
-                '┃ 🛠️ MODULACIÓN & SEGURIDAD ┃',
-                '┗━━━━━━━━━━━━━━━━━━━━━━┛',
-                `🚫 .filtro-palabras [on/off] ➤ Filtro: ${isWordFilterEnabled ? 'ACTIVO' : 'INACTIVO'}`,
-                `🔗 .bloquear-links [on/off] ➤ Bloqueo: ${isAntiLinkEnabled ? 'ACTIVO' : 'INACTIVO'}`,
-                `⚠️ .anti-spam [on/off] ➤ Sistema: ${isAntiSpamEnabled ? 'ACTIVO' : 'INACTIVO'}`,
-                '👢 .kick [etiqueta] ➤ Expulsar un miembro',
-                '⭐ .promover [etiqueta] ➤ Promover a un miembro a admin'
-            ];
+        case "3":
+            text = `
+            *🟢 Filtro de Palabras*
+
+            Evita que los usuarios envíen mensajes con palabras ofensivas o no deseadas.
+            
+            *Estado Actual:* ${isWordFilterEnabled ? 'ACTIVO' : 'INACTIVO'}
+            
+            *Comandos:*
+            🟢 .wordfilter on ➤ Habilita el Filtro de Palabras
+            🔴 .wordfilter off ➤ Deshabilita el Filtro de Palabras
+            `;
             break;
-        case '4':
-            lines = [
-                'ℹ️ INFORMACIÓN / AYUDA',
-                '────────────────────────',
-                '💡 Este menú es exclusivo para el creador.',
-                '💻 Usa los números para navegar por las secciones.',
-                '🌐 Cada comando tiene su explicación detallada.'
-            ];
+        case "4":
+            text = `
+            *🟢 Anti-Spam*
+
+            Detecta y bloquea a los usuarios que envían muchos mensajes en un corto período de tiempo.
+            
+            *Estado Actual:* ${isAntiSpamEnabled ? 'ACTIVO' : 'INACTIVO'}
+            
+            *Comandos:*
+            🟢 .antispam on ➤ Habilita el Anti-Spam
+            🔴 .antispam off ➤ Deshabilita el Anti-Spam
+            `;
             break;
-        case '0':
-            lines = ['❌ Cerrando menú. ¡Hasta luego, creador!'];
+        case "5":
+            text = `
+            *🟢 Anti-Prefijo*
+
+            Expulsa a los usuarios que tienen un número con un prefijo telefónico no permitido (por ejemplo, números de Medio Oriente).
+            
+            *Estado Actual:* ${isAntiPrefixEnabled ? 'ACTIVO' : 'INACTIVO'}
+            
+            *Comandos:*
+            🟢 .antiprefix on ➤ Habilita el Anti-Prefijo
+            🔴 .antiprefix off ➤ Deshabilita el Anti-Prefijo
+            `;
             break;
         default:
-            lines = ['⚠️ Opción inválida. Escribe un número del 0 al 4.'];
-            break;
+            text = "Opción no válida. Por favor, selecciona una de las opciones del menú principal.";
+            footer = "Puedes volver a escribir .menu para ver las opciones.";
     }
 
-    for (let line of lines) {
-        await sock.sendMessage(jid, { text: line });
-        await new Promise(resolve => setTimeout(resolve, 150));
-    }
-};
+    const message = {
+        text: text,
+        footer: footer,
+    };
 
-const isCreator = (jid) => {
-    return jid === CREATOR_JID;
+    await sock.sendMessage(jid, message);
 };
 
 module.exports = {
     sendFuturisticMenu,
-    sendFuturisticSection,
-    isCreator
+    sendFuturisticSection
 };
