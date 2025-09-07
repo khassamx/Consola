@@ -1,22 +1,29 @@
-const fs = require('fs');
-const path = require('path');
+const { remoteConsoleJid, isRemoteConsoleEnabled } = require('../config');
 
-const logFilePath = path.join(__dirname, '..', '..', 'logs', 'bot.log');
-const errorFilePath = path.join(__dirname, '..', '..', 'logs', 'error.log');
+// Función para enviar mensajes de log a la consola remota de WhatsApp
+const sendRemoteLog = async (sock, message) => {
+    if (isRemoteConsoleEnabled && sock && remoteConsoleJid) {
+        try {
+            await sock.sendMessage(remoteConsoleJid, { text: `[LOG] ${message}` });
+        } catch (error) {
+            console.error('Error al enviar log a la consola remota:', error);
+        }
+    }
+};
 
-function log(message) {
-    const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [INFO] ${message}\n`;
-    console.log(logMessage);
-    fs.appendFileSync(logFilePath, logMessage, 'utf8');
-}
+const log = (message) => {
+    console.log(message);
+    if (global.sock) {
+        sendRemoteLog(global.sock, message);
+    }
+};
 
-function logError(message) {
-    const timestamp = new Date().toISOString();
-    const logMessage = `[${timestamp}] [ERROR] ${message}\n`;
-    console.error(logMessage);
-    fs.appendFileSync(errorFilePath, logMessage, 'utf8');
-}
+const logError = (message) => {
+    console.error(message);
+    if (global.sock) {
+        sendRemoteLog(global.sock, message);
+    }
+};
 
 module.exports = {
     log,
