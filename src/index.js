@@ -6,13 +6,14 @@ const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const os = require('os');
 
-const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isWelcomeMessageEnabled, isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, botMode, botVersion } = require('./config');
+const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isWelcomeMessageEnabled, isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, botMode, botVersion, isAntiPrefixEnabled, arabicPrefixes, isRemoteConsoleEnabled, remoteConsoleJid, COMMAND_STATUS } = require('./config');
 const { log, logError } = require('./utils/logger');
 const { loadSentRecords, addSentUser } = require('./utils/persistence');
 const { sendWelcomeMessageWithPersistence } = require('./utils/welcomeMessage');
 const { handleGeneralCommands } = require('./handlers/generalCommands');
 const { handleCreatorCommands } = require('./handlers/creatorCommands');
 const { sendFuturisticMenu, sendFuturisticSection, isCreator } = require('./handlers/futuristicMenu');
+const { sendUserMenu } = require('./handlers/userMenu');
 
 const rl = readline.createInterface({
     input: process.stdin,
@@ -105,7 +106,7 @@ const handleConsoleInput = async (input) => {
                     botMode = mode;
                     console.log(`✅ Modo del bot cambiado a: *${mode.charAt(0).toUpperCase() + mode.slice(1)}*.`);
                 } else {
-                    console.log('❌ Modo incorrecto. Modos disponibles: `activo`, `silencioso`, `fiesta`.');
+                    await sock.sendMessage(senderJid, { text: '❌ Modo incorrecto. Modos disponibles: `activo`, `silencioso`, `fiesta`.' });
                 }
                 showMenu();
             });
@@ -138,11 +139,9 @@ const handleConsoleInput = async (input) => {
     showMenu();
 };
 
-// Función de retraso para efectos de animación
 const sleep = (ms) => new Promise(resolve => setTimeout(resolve, ms));
 
-// Efecto de escritura de máquina de escribir
-async function typeWriterEffect(sock, jid, text, delay = 50) {
+async function typeWriterEffect(text, delay = 50) {
     let currentLine = "";
     for (let i = 0; i < text.length; i++) {
         currentLine += text[i];
@@ -150,10 +149,8 @@ async function typeWriterEffect(sock, jid, text, delay = 50) {
         await sleep(delay);
     }
     console.log();
-    await sock.sendMessage(jid, { text: text });
 }
 
-// Banner estilo consola hacker cinematográfico
 const cinematicBannerLines = [
     " ██████╗ ██████╗ ███╗   ██╗███████╗███╗   ██╗███████╗",
     "██╔════╝██╔═══██╗████╗  ██║██╔════╝████╗  ██║██╔════╝",
@@ -164,8 +161,7 @@ const cinematicBannerLines = [
     "                   🌌 CONSOLE MODE 🌌                "
 ];
 
-// Función para imprimir línea con colores simulados (solo consola)
-function printColorLine(line) {
+function printColorLine(line, color) {
     const green = '\x1b[32m';
     const cyan = '\x1b[36m';
     const reset = '\x1b[0m';
@@ -181,33 +177,30 @@ function printColorLine(line) {
     console.log(coloredLine);
 }
 
-// Animación de carga con progreso gradual y parpadeo
-async function loadingAnimation(sock, jid, message, totalSteps = 10, delayPerStep = 100) {
-    await sock.sendMessage(jid, { text: message });
+async function loadingAnimation(message, totalSteps = 50, delayPerStep = 100) {
+    const rainbowColors = [
+        '\x1b[31m', // Red
+        '\x1b[33m', // Yellow
+        '\x1b[32m', // Green
+        '\x1b[36m', // Cyan
+        '\x1b[34m', // Blue
+        '\x1b[35m', // Magenta
+    ];
+    const reset = '\x1b[0m';
     let progressBar = "[          ]";
 
     for (let i = 0; i <= totalSteps; i++) {
-        let filled = '■'.repeat(i);
-        let empty = ' '.repeat(totalSteps - i);
-        let currentProgress = `[${filled}${empty}]`;
-
+        let filled = '█'.repeat(Math.floor(i / (totalSteps / 10)));
+        let empty = ' '.repeat(10 - Math.floor(i / (totalSteps / 10)));
+        let color = rainbowColors[i % rainbowColors.length];
+        let currentProgress = `${color}[${filled}${empty}]${reset}`;
         process.stdout.write(`\r${message} ${currentProgress}`);
-        
-        if (i > 0) {
-            await sock.sendMessage(jid, { text: `${message} ${currentProgress}` });
-            await sleep(delayPerStep / 2);
-            await sock.sendMessage(jid, { text: `${message} [${' '.repeat(totalSteps)}]` });
-            await sleep(delayPerStep / 2);
-        } else {
-             await sock.sendMessage(jid, { text: `${message} ${currentProgress}` });
-             await sleep(delayPerStep);
-        }
+        await sleep(delayPerStep);
     }
     console.log();
 }
 
-// Función de inicio con banner y carga animada (CINEMATOGRÁFICA)
-async function startBotCinematic() {
+async function startBotCinematic(skipQr = false) {
     loadSentRecords();
     const sessionPath = './session';
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
@@ -226,7 +219,7 @@ async function startBotCinematic() {
     sock.ev.on("connection.update", async (update) => {
         const { connection, qr, lastDisconnect } = update;
 
-        if (qr) {
+        if (qr && !skipQr) {
             log("📌 Escanea este QR con tu WhatsApp:");
             qrcode.generate(qr, { small: true });
         }
@@ -235,7 +228,7 @@ async function startBotCinematic() {
             console.log(`Conexión cerrada. Razón: ${statusCode}`);
             if (statusCode !== DisconnectReason.loggedOut) {
                 console.log('Reconectando...');
-                await startBotCinematic();
+                await startBotCinematic(skipQr);
             } else {
                 console.log('Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.');
             }
@@ -246,21 +239,21 @@ async function startBotCinematic() {
                 
                 for (let line of cinematicBannerLines) {
                     printColorLine(line);
-                    await typeWriterEffect(sock, creatorJid, line, 70);
-                    await sleep(300);
+                    await typeWriterEffect(line, 5);
+                    await sleep(30);
                 }
                 
                 await sleep(500);
-                await typeWriterEffect(sock, creatorJid, "\nIniciando sistema central...", 60);
+                await typeWriterEffect("\nIniciando sistema central...", 60);
 
-                await loadingAnimation(sock, creatorJid, "Cargando módulos esenciales", 10, 150);
+                await loadingAnimation("Cargando módulos esenciales", 10, 150);
                 await sleep(500);
-                await loadingAnimation(sock, creatorJid, "Estableciendo protocolos de seguridad", 10, 150);
+                await loadingAnimation("Estableciendo protocolos de seguridad", 10, 150);
                 await sleep(500);
-                await loadingAnimation(sock, creatorJid, "Sincronizando base de datos", 10, 150);
+                await loadingAnimation("Sincronizando base de datos", 10, 150);
                 await sleep(500);
 
-                await typeWriterEffect(sock, creatorJid, "✅ Sistema listo. Acceso al Dashboard del Creador activado.", 60);
+                await typeWriterEffect("✅ Sistema listo. Acceso al Dashboard del Creador activado.", 60);
                 await sleep(1000);
                 
                 await sendFuturisticMenu(sock, creatorJid);
@@ -300,6 +293,58 @@ async function startBotCinematic() {
                 const messageText = m.message?.conversation || m.message?.extendedTextMessage?.text || '';
                 const senderParticipant = m.key.participant || m.key.remoteJid;
                 const senderName = m.pushName || senderParticipant.split('@')[0];
+                
+                if (isCreator(senderJid) && !isGroup && messageText.trim() === '~consola-status') {
+                     const uptime = process.uptime();
+                     const uptimeDays = Math.floor(uptime / (3600 * 24));
+                     const uptimeHours = Math.floor((uptime % (3600 * 24)) / 3600);
+                     const uptimeMinutes = Math.floor((uptime % 3600) / 60);
+                     const uptimeSeconds = Math.floor(uptime % 60);
+                     const freeMem = (os.freemem() / 1024 / 1024).toFixed(2);
+                     const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
+                     await sock.sendMessage(senderJid, { text: `
+*✅ Estado del Bot (Consola Remota)*
+  - En línea: Sí
+  - Tiempo de actividad: ${uptimeDays}d, ${uptimeHours}h, ${uptimeMinutes}m, ${uptimeSeconds}s
+  - Memoria: ${freeMem} MB / ${totalMem} MB
+  - Versión: ${botVersion}
+  - Modo: ${botMode.charAt(0).toUpperCase() + botMode.slice(1)}
+                     `});
+                     return;
+                }
+                
+                // FILTRO DE PREFIJOS
+                if (isAntiPrefixEnabled && isGroup) {
+                    const countryCode = senderParticipant.split('@')[0].substring(0, 3);
+                    if (arabicPrefixes.includes(countryCode)) {
+                        await sock.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
+                        await sock.sendMessage(senderJid, { delete: m.key });
+                        await sock.sendMessage(senderJid, { text: `⚠️ Usuario expulsado. El prefijo de su número (*+${countryCode}*) no está permitido.` });
+                        log(`🚫 Filtro de Prefijos: Usuario con código de país '${countryCode}' expulsado y su mensaje eliminado de [${senderJid}].`);
+                        return;
+                    }
+                }
+
+                // ANTI-LINK ESTRICTO
+                const linkRegex = /(https?:\/\/|www\.)[^\s]+/gi;
+                if (isAntiLinkEnabled && isGroup && messageText.match(linkRegex)) {
+                    try {
+                        const groupMetadata = await sock.groupMetadata(senderJid);
+                        const senderIsAdmin = groupMetadata.participants.find(p => p.id === senderParticipant)?.admin !== null;
+
+                        if (!senderIsAdmin) {
+                            await sock.sendMessage(senderJid, { delete: m.key });
+                            await sock.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
+                            await sock.sendMessage(senderJid, { text: `❌ Enlace detectado. El usuario ha sido expulsado por enviar un link.` });
+                            log(`🚫 Anti-Link: Mensaje con enlace de ${senderName} eliminado en [${senderJid}]. Usuario expulsado.`);
+                        } else {
+                            log(`ℹ️ Anti-Link: Enlace ignorado, el remitente es un administrador.`);
+                        }
+                    } catch (e) {
+                        logError(`Error en Anti-Link: ${e.message}`);
+                    }
+                    return;
+                }
 
                 if (isWordFilterEnabled) {
                     for (const word of OFFENSIVE_WORDS) {
@@ -309,24 +354,6 @@ async function startBotCinematic() {
                             return;
                         }
                     }
-                }
-
-                if (isAntiLinkEnabled && isGroup && messageText.match(/(https?:\/\/[^\s]+)/gi)) {
-                    try {
-                        const groupMetadata = await sock.groupMetadata(senderJid);
-                        const senderIsAdmin = groupMetadata.participants.find(p => p.id === senderParticipant)?.admin !== null;
-
-                        if (!senderIsAdmin) {
-                            await sock.sendMessage(senderJid, { delete: m.key });
-                            await sock.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
-                            log(`🚫 Anti-Link: Mensaje con enlace de ${senderName} eliminado en [${senderJid}]. Usuario expulsado.`);
-                        } else {
-                            log(`ℹ️ Anti-Link: Enlace ignorado, el remitente es un administrador.`);
-                        }
-                    } catch (e) {
-                        logError(`Error en Anti-Link: ${e.message}`);
-                    }
-                    return;
                 }
                 
                 if (isCreator(senderJid)) {
@@ -338,6 +365,11 @@ async function startBotCinematic() {
                         await sendFuturisticSection(sock, senderJid, text);
                         return;
                     }
+                }
+
+                if (messageText.toLowerCase().trim() === '!menu' || messageText.toLowerCase().trim() === '!help') {
+                    await sendUserMenu(sock, senderJid);
+                    return;
                 }
 
                 const isCreatorCommand = await handleCreatorCommands(sock, m, messageText);
@@ -368,4 +400,26 @@ async function startBotCinematic() {
     });
 }
 
-startBotCinematic();
+// Nueva función principal para gestionar el flujo de inicio
+async function main() {
+    console.clear();
+    const sessionExists = fs.existsSync('./session/creds.json');
+    
+    // Si la sesión existe, reproduce la película y se conecta automáticamente
+    if (sessionExists) {
+        await startBotCinematic(true);
+    } else {
+        // Si no hay sesión, reproduce la película y luego pide el QR
+        await startBotCinematic(false);
+        rl.question(`\n${'\x1b[32m'}¿Deseas empezar? (Y/n):${'\x1b[0m'} `, async (answer) => {
+            if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
+                log('Iniciando...');
+            } else {
+                log('Cerrando bot. ¡Hasta pronto!');
+                process.exit();
+            }
+        });
+    }
+}
+
+main();
