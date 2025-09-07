@@ -30,7 +30,6 @@ const welcomeFrames = [
   "      CREADO POR NOADEVSTUDIO      "
 ];
 
-// ✅ SOLUCIÓN CORRECTA: Se almacenan las funciones de chalk en el arreglo
 const rainbowColors = [
   chalk.red,
   chalk.yellow,
