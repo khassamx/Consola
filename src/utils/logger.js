@@ -1,39 +1,37 @@
-const { CREATOR_JID, isRemoteConsoleEnabled } = require('../config');
+const { CREATOR_JID } = require('../config');
 
-// Función para enviar mensajes de log a la consola remota de WhatsApp
-const sendRemoteLog = async (sock, message) => {
-    // Se verifica si la consola remota está activada y si el objeto sock es válido.
-    if (isRemoteConsoleEnabled && sock) {
-        try {
-            // Se usa el JID fijo del creador para enviar el mensaje.
-            // Esto asegura que el mensaje tenga un destino válido incluso si el bot
-            // no ha terminado de autenticarse.
-            await sock.sendMessage(CREATOR_JID, { text: `[LOG] ${message}` });
-        } catch (error) {
-            console.error('❌ Error al enviar log a la consola remota:', error);
-        }
+// Variable global para la conexión, se asignará desde index.js
+let sock = null;
+let remoteChatId = CREATOR_JID;
+
+function setSocket(socket) {
+    sock = socket;
+}
+
+const sendRemoteLog = async (message) => {
+    if (!sock || !remoteChatId) {
+        console.warn('Consola remota no definida, log local:', message);
+        return;
+    }
+    try {
+        await sock.sendMessage(remoteChatId, { text: message });
+    } catch (err) {
+        console.error('Error al enviar log remoto:', err);
     }
 };
 
-const log = (sock, ...args) => {
-    const message = args.map(a => 
-        typeof a === "object" ? JSON.stringify(a, null, 2) : a
-    ).join(" ");
-
-    console.log(`[${new Date().toISOString()}] ${message}`);
-    sendRemoteLog(sock, message);
+const log = (source, message) => {
+    const timestamp = new Date().toISOString();
+    const formattedMessage = `[${timestamp}] ${source ? `[${source}]` : ''} ${message}`;
+    console.log(formattedMessage);
+    sendRemoteLog(formattedMessage);
 };
 
-const logError = (sock, ...args) => {
-    const message = args.map(a => 
-        typeof a === "object" ? JSON.stringify(a, null, 2) : a
-    ).join(" ");
-    
-    console.error(`[${new Date().toISOString()}] ERROR: ${message}`);
-    sendRemoteLog(sock, `ERROR: ${message}`);
+const logError = (source, error) => {
+    const timestamp = new Date().toISOString();
+    const formattedMessage = `[${timestamp}] ${source ? `[${source}]` : ''} ❌ ERROR: ${error}`;
+    console.error(formattedMessage);
+    sendRemoteLog(formattedMessage);
 };
 
-module.exports = {
-    log,
-    logError
-};
+module.exports = { log, logError, setSocket };
