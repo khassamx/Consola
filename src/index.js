@@ -1,20 +1,19 @@
 const { makeWASocket, useMultiFileAuthState, DisconnectReason, fetchLatestBaileysVersion, Browsers } = require('@whiskeysockets/baileys');
 const readline = require('readline');
 const pino = require('pino');
-const cron = require('node-cron');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const os = require('os');
+const chalk = require('chalk');
 
-const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isWelcomeMessageEnabled, isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, botMode, botVersion, isAntiPrefixEnabled, arabicPrefixes, isRemoteConsoleEnabled, remoteConsoleJid, COMMAND_STATUS } = require('./config');
+const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isAntiSpamEnabled, botMode, botVersion, isAntiPrefixEnabled, arabicPrefixes, isCreator } = require('./config');
 const { log, logError } = require('./utils/logger');
-const { loadSentRecords, addSentUser } = require('./utils/persistence');
-const { sendWelcomeMessageWithPersistence } = require('./utils/welcomeMessage');
 const { handleGeneralCommands } = require('./handlers/generalCommands');
 const { handleCreatorCommands } = require('./handlers/creatorCommands');
-const { sendFuturisticMenu, sendFuturisticSection, isCreator } = require('./handlers/futuristicMenu');
+const { sendFuturisticMenu, sendFuturisticSection } = require('./handlers/futuristicMenu');
 const { sendUserMenu } = require('./handlers/userMenu');
 
+// Dimensiones para la animación
 const width = 70;
 const height = 20;
 
@@ -32,19 +31,9 @@ const welcomeFrames = [
   "      CREADO POR NOADEVSTUDIO      "
 ];
 
-// Colores ANSI para el efecto arcoíris, sin la librería 'chalk'
-const ansiColors = [
-    "\x1b[31m", // Rojo
-    "\x1b[33m", // Amarillo
-    "\x1b[32m", // Verde
-    "\x1b[36m", // Cian
-    "\x1b[34m", // Azul
-    "\x1b[35m", // Magenta
-];
-const resetColor = "\x1b[0m";
-
+const rainbowColors = [chalk.red, chalk.yellow, chalk.green, chalk.cyan, chalk.blue, chalk.magenta];
 function rainbowText(text) {
-    return text.split('').map((c, i) => ansiColors[i % ansiColors.length] + c).join('') + resetColor;
+    return text.split('').map((c, i) => rainbowColors[i % rainbowColors.length](c)).join('');
 }
 
 let pos = 0;
@@ -56,31 +45,31 @@ let qrCodeData = null;
 let botIsReady = false;
 let conn = null;
 
+// Variables globales para el nuevo contador y el estado
+let mensajesEnviados = 0;
+
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout
 });
 
-const tickets = {}
-let ticketCounter = 0
-let currentMode = 'menu'
-let activeJid = null
-
-if (!fs.existsSync('./logs')) {
-    fs.mkdirSync('./logs')
-}
-if (!fs.existsSync('./session')) {
-    fs.mkdirSync('./session')
-}
-
-// Simulación de nubes y estrellas
 let cloudLayer1 = Array.from({ length: width }, () => Math.random() < 0.12 ? '☁️' : ' ');
 let cloudLayer2 = Array.from({ length: width }, () => Math.random() < 0.08 ? '☁️' : ' ');
 let starsLayer = Array.from({ length: width }, () => Math.random() < 0.05 ? '✨' : ' ');
 
+// Función auxiliar para enviar mensajes e incrementar el contador
+async function sendMessageWithCounter(jid, content) {
+    try {
+        const result = await conn.sendMessage(jid, content);
+        mensajesEnviados++;
+        return result;
+    } catch (err) {
+        logError(null, `Error al enviar mensaje a ${jid}: ${err.message}`);
+    }
+}
+
 function drawFrame() {
   console.clear();
-
   const welcomeMessage = welcomeFrames[Math.floor(cycle / 2) % welcomeFrames.length];
   console.log(rainbowText(welcomeMessage.padEnd(width/2 + welcomeMessage.length/2, ' ').padStart(width, ' ')) + "\n");
 
@@ -90,14 +79,9 @@ function drawFrame() {
 
   for (let i = 0; i < height; i++) {
     let line = Array(width).fill(' ');
-
-    if (i === Math.floor(height / 4)) {
-      line = cloudLayer1.slice();
-    } else if (i === Math.floor(height / 2)) {
-      line = cloudLayer2.slice();
-    } else if (i === Math.floor(height / 1.5)) {
-      line = starsLayer.slice();
-    }
+    if (i === Math.floor(height / 4)) line = cloudLayer1.slice();
+    else if (i === Math.floor(height / 2)) line = cloudLayer2.slice();
+    else if (i === Math.floor(height / 1.5)) line = starsLayer.slice();
     
     if (i === verticalPos) {
       const halcon = halconFrames[frameIndex];
@@ -111,8 +95,16 @@ function drawFrame() {
   }
 
   console.log('_'.repeat(width));
-
   console.log("\n".repeat(2));
+  
+  // Nuevo: Mostrar fecha y hora
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
+  console.log(chalk.yellow(`📅 Fecha: ${dateStr}`));
+  console.log(chalk.cyan(`⏰ Hora: ${timeStr}`));
+  console.log(`\n${chalk.green('Mensajes enviados:')} ${chalk.bold.white(mensajesEnviados)}`);
+
   if (qrCodeData) {
       console.log(rainbowText("📌 Escanea este QR con tu WhatsApp:"));
       qrcode.generate(qrCodeData, { small: true });
@@ -132,12 +124,11 @@ function drawFrame() {
 
 const animationInterval = setInterval(drawFrame, 120);
 
-// Lógica de Baileys
+// Funciones de Baileys
 async function connectToWhatsApp(skipQr = false) {
     const sessionPath = './session';
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
     const { version } = await fetchLatestBaileysVersion();
-
     conn = makeWASocket({
         version,
         auth: state,
@@ -147,14 +138,9 @@ async function connectToWhatsApp(skipQr = false) {
     global.sock = conn;
 
     conn.ev.on('creds.update', saveCreds);
-
     conn.ev.on("connection.update", (update) => {
         const { connection, qr, lastDisconnect } = update;
-
-        if (qr && !skipQr) {
-            qrCodeData = qr;
-        }
-
+        if (qr && !skipQr) qrCodeData = qr;
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
             log(conn, `Conexión cerrada. Razón: ${statusCode}`);
@@ -204,33 +190,31 @@ async function connectToWhatsApp(skipQr = false) {
   - En línea: Sí
   - Tiempo de actividad: ${uptimeDays}d, ${uptimeHours}h, ${uptimeMinutes}m, ${uptimeSeconds}s
   - Memoria: ${freeMem} MB / ${totalMem} MB
+  - Mensajes enviados: ${mensajesEnviados}
   - Versión: ${botVersion}
   - Modo: ${botMode.charAt(0).toUpperCase() + botMode.slice(1)}
                      `});
                      return;
                 }
-                
                 if (isAntiPrefixEnabled && isGroup) {
                     const countryCode = senderParticipant.split('@')[0].substring(0, 3);
                     if (arabicPrefixes.includes(countryCode)) {
+                        await sendMessageWithCounter(senderJid, { delete: m.key });
                         await conn.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
-                        await conn.sendMessage(senderJid, { delete: m.key });
-                        await conn.sendMessage(senderJid, { text: `⚠️ Usuario expulsado. El prefijo de su número (*+${countryCode}*) no está permitido.` });
+                        await sendMessageWithCounter(senderJid, { text: `⚠️ Usuario expulsado. El prefijo de su número (*+${countryCode}*) no está permitido.` });
                         log(conn, `🚫 Filtro de Prefijos: Usuario con código de país '${countryCode}' expulsado y su mensaje eliminado de [${senderJid}].`);
                         return;
                     }
                 }
-
                 const linkRegex = /(https?:\/\/|www\.)[^\s]+/gi;
                 if (isAntiLinkEnabled && isGroup && messageText.match(linkRegex)) {
                     try {
                         const groupMetadata = await conn.groupMetadata(senderJid);
                         const senderIsAdmin = groupMetadata.participants.find(p => p.id === senderParticipant)?.admin !== null;
-
                         if (!senderIsAdmin) {
-                            await conn.sendMessage(senderJid, { delete: m.key });
+                            await sendMessageWithCounter(senderJid, { delete: m.key });
                             await conn.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
-                            await conn.sendMessage(senderJid, { text: `❌ Enlace detectado. El usuario ha sido expulsado por enviar un link.` });
+                            await sendMessageWithCounter(senderJid, { text: `❌ Enlace detectado. El usuario ha sido expulsado por enviar un link.` });
                             log(conn, `🚫 Anti-Link: Mensaje con enlace de ${senderName} eliminado en [${senderJid}]. Usuario expulsado.`);
                         } else {
                             log(conn, `ℹ️ Anti-Link: Enlace ignorado, el remitente es un administrador.`);
@@ -240,17 +224,15 @@ async function connectToWhatsApp(skipQr = false) {
                     }
                     return;
                 }
-
                 if (isWordFilterEnabled) {
                     for (const word of OFFENSIVE_WORDS) {
                         if (messageText.toLowerCase().includes(word.toLowerCase())) {
-                            await conn.sendMessage(senderJid, { text: `⚠️ Por favor, mantén un lenguaje respetuoso. El uso de palabras ofensivas no está permitido.` });
+                            await sendMessageWithCounter(senderJid, { text: `⚠️ Por favor, mantén un lenguaje respetuoso. El uso de palabras ofensivas no está permitido.` });
                             log(conn, `😠 Alerta: Palabra ofensiva detectada de ${senderName} en [${senderJid}]`);
                             return;
                         }
                     }
                 }
-                
                 if (isCreator(senderJid)) {
                     const text = messageText.trim();
                     if (text === '~menu') {
@@ -261,43 +243,26 @@ async function connectToWhatsApp(skipQr = false) {
                         return;
                     }
                 }
-
                 if (messageText.toLowerCase().trim() === '!menu' || messageText.toLowerCase().trim() === '!help') {
                     await sendUserMenu(conn, senderJid);
                     return;
                 }
-
                 const isCreatorCommand = await handleCreatorCommands(conn, m, messageText);
                 if (isCreatorCommand) {
                     return;
                 }
-
                 await handleGeneralCommands(conn, m, messageText);
-
-                if (messageText.toLowerCase().trim() === '!abrir' && !isGroup) {
-                    if (tickets[senderJid] && tickets[senderJid].status === 'open') {
-                        await conn.sendMessage(senderJid, { text: "Este ticket ya está abierto." });
-                    } else {
-                        ticketCounter = (ticketCounter % 900) + 1;
-                        tickets[senderJid] = { id: ticketCounter, status: 'open', name: senderName };
-                        await conn.sendMessage(senderJid, { text: `Ticket abierto. ID: ${tickets[senderJid].id}` });
-                        log(conn, `🎟️ Ticket: Se abrió un ticket para [${senderJid}]`);
-                    }
-                } else if (messageText.toLowerCase().trim() === '!cerrar' && tickets[senderJid] && tickets[senderJid].status === 'open' && !isGroup) {
-                    tickets[senderJid].status = 'closed';
-                    await conn.sendMessage(senderJid, { text: "Su ticket ha sido cerrado. ¡Gracias por usar nuestro servicio!" });
-                    log(conn, `🎟️ Ticket: Se cerró un ticket para [${senderJid}]`);
-                } else if (messageText.toLowerCase().trim() === '!cerrar' && !tickets[senderJid] && !isGroup) {
-                    await conn.sendMessage(senderJid, { text: "No tienes un ticket abierto para cerrar." });
-                }
             }
         }
     });
 }
 
+// Lógica de inicio
 async function main() {
+    if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
+    if (!fs.existsSync('./session')) fs.mkdirSync('./session');
+
     const sessionExists = fs.existsSync('./session/creds.json');
-    
     if (sessionExists) {
         log(null, '✅ Sesión encontrada. Iniciando conexión automáticamente...');
         await connectToWhatsApp(true);
@@ -307,7 +272,7 @@ async function main() {
         const checkQrInterval = setInterval(() => {
             if (qrCodeData) {
                 clearInterval(checkQrInterval);
-                rl.question(`\n${rainbowText('¿Deseas empezar? (Y/n):')} `, async (answer) => {
+                rl.question(`\n${chalk.hex('#FFD700')('¿Deseas empezar? (Y/n):')} `, async (answer) => {
                     if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
                         log(null, '📌 Escaneando código QR...');
                     } else {
