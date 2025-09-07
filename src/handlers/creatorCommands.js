@@ -1,6 +1,8 @@
 const { CREATOR_JID, isAntiLinkEnabled, isWordFilterEnabled, isWelcomeMessageEnabled, botMode, COMMAND_STATUS } = require('../config');
 const { sendWelcomeMessageWithPersistence } = require('../utils/welcomeMessage');
 const { getSentUsers } = require('../utils/persistence');
+const { log, logError } = require('../utils/logger');
+
 
 const handleCreatorCommands = async (sock, m, messageText) => {
     const senderJid = m.key.remoteJid;
@@ -46,10 +48,10 @@ const handleCreatorCommands = async (sock, m, messageText) => {
             if (targetJid && msgBody) {
                 try {
                     await sock.sendMessage(targetJid, { text: msgBody });
-                    log(`Mensaje enviado a ${targetJid} desde el comando .e`);
+                    log(sock, `Mensaje enviado a ${targetJid} desde el comando .e`);
                     await sock.sendMessage(senderJid, { text: `✅ Mensaje enviado a ${targetNumber}` });
                 } catch (e) {
-                    logError(`Error al enviar mensaje con .e: ${e.message}`);
+                    logError(sock, `Error al enviar mensaje con .e: ${e.message}`);
                     await sock.sendMessage(senderJid, { text: `❌ No se pudo enviar el mensaje a ${targetNumber}.` });
                 }
             } else {
@@ -107,7 +109,7 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 return true;
             }
             await sock.groupParticipantsUpdate(senderJid, [mentionedJid], 'remove');
-            log(`Miembro ${mentionedJid} expulsado por el creador.`);
+            log(sock, `Miembro ${mentionedJid} expulsado por el creador.`);
             await sock.sendMessage(senderJid, { text: `👢 El usuario *${mentionedJid.split('@')[0]}* ha sido expulsado del grupo.` });
             return true;
         case isGroup && command.startsWith('.promover') && mentionedJid !== undefined:
@@ -116,7 +118,7 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                 return true;
             }
             await sock.groupParticipantsUpdate(senderJid, [mentionedJid], 'promote');
-            log(`Miembro ${mentionedJid} promovido a admin.`);
+            log(sock, `Miembro ${mentionedJid} promovido a admin.`);
             await sock.sendMessage(senderJid, { text: `⭐ El usuario *${mentionedJid.split('@')[0]}* ha sido promovido a administrador.` });
             return true;
         case isGroup && command.startsWith('.limpiar '):
@@ -218,9 +220,9 @@ const handleCreatorCommands = async (sock, m, messageText) => {
                     mentions: participants
                 });
                 
-                log(`Comando .tag ejecutado en [${senderJid}] por el creador.`);
+                log(sock, `Comando .tag ejecutado en [${senderJid}] por el creador.`);
             } catch (error) {
-                logError(`Error al ejecutar .tag: ${error.message}`);
+                logError(sock, `Error al ejecutar .tag: ${error.message}`);
                 await sock.sendMessage(senderJid, { text: '❌ Ocurrió un error al intentar mencionar a todos.' });
             }
             return true;
