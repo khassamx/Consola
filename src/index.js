@@ -7,7 +7,7 @@ const os = require('os');
 const chalk = require('chalk');
 
 const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isAntiSpamEnabled, botMode, botVersion, isAntiPrefixEnabled, arabicPrefixes, isCreator } = require('./config');
-const { log, logError, setSocket } = require('./utils/logger');
+const { log, logError } = require('./utils/logger');
 const { handleGeneralCommands } = require('./handlers/generalCommands');
 const { handleCreatorCommands } = require('./handlers/creatorCommands');
 const { sendFuturisticMenu, sendFuturisticSection } = require('./handlers/futuristicMenu');
@@ -71,7 +71,7 @@ async function sendMessageWithCounter(jid, content) {
         mensajesEnviados++;
         return result;
     } catch (err) {
-        logError(null, `Error al enviar mensaje a ${jid}: ${err.message}`);
+        logError(null, `Error al enviar mensaje a ${jid}: ${err.message}`, conn, CREATOR_JID);
     }
 }
 
@@ -141,7 +141,6 @@ async function connectToWhatsApp(skipQr = false) {
         logger: pino({ level: 'silent' })
     });
     global.sock = conn;
-    setSocket(conn);
 
     conn.ev.on('creds.update', saveCreds);
     conn.ev.on("connection.update", (update) => {
@@ -149,17 +148,17 @@ async function connectToWhatsApp(skipQr = false) {
         if (qr && !skipQr) qrCodeData = qr;
         if (connection === 'close') {
             const statusCode = lastDisconnect?.error?.output?.statusCode;
-            log(conn, `Conexión cerrada. Razón: ${statusCode}`);
+            log(conn, `Conexión cerrada. Razón: ${statusCode}`, conn, CREATOR_JID);
             if (statusCode !== DisconnectReason.loggedOut) {
-                log(conn, 'Reconectando...');
+                log(conn, 'Reconectando...', conn, CREATOR_JID);
                 connectToWhatsApp(skipQr);
             } else {
-                log(conn, 'Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.');
+                log(conn, 'Sesión cerrada. Por favor, elimina la carpeta session e inicia de nuevo.', conn, CREATOR_JID);
                 qrCodeData = null;
                 botIsReady = false;
             }
         } else if (connection === "open") {
-            log(conn, "✅ Bot conectado a WhatsApp");
+            log(conn, "✅ Bot conectado a WhatsApp", conn, CREATOR_JID);
             botIsReady = true;
             qrCodeData = null;
         }
@@ -173,7 +172,7 @@ async function connectToWhatsApp(skipQr = false) {
                 const senderJid = deletedMsgKey.remoteJid;
                 const participantJid = deletedMsgKey.participant || senderJid;
                 const senderName = m.pushName || participantJid.split('@')[0];
-                log(conn, `🗑️ ALERTA: Mensaje eliminado por ${senderName} en [${senderJid}].`);
+                log(conn, `🗑️ ALERTA: Mensaje eliminado por ${senderName} en [${senderJid}].`, conn, CREATOR_JID);
                 return;
             }
             if (!m.key.fromMe) {
@@ -208,7 +207,7 @@ async function connectToWhatsApp(skipQr = false) {
                         await sendMessageWithCounter(senderJid, { delete: m.key });
                         await conn.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
                         await sendMessageWithCounter(senderJid, { text: `⚠️ Usuario expulsado. El prefijo de su número (*+${countryCode}*) no está permitido.` });
-                        log(conn, `🚫 Filtro de Prefijos: Usuario con código de país '${countryCode}' expulsado y su mensaje eliminado de [${senderJid}].`);
+                        log(conn, `🚫 Filtro de Prefijos: Usuario con código de país '${countryCode}' expulsado y su mensaje eliminado de [${senderJid}].`, conn, CREATOR_JID);
                         return;
                     }
                 }
@@ -221,12 +220,12 @@ async function connectToWhatsApp(skipQr = false) {
                             await sendMessageWithCounter(senderJid, { delete: m.key });
                             await conn.groupParticipantsUpdate(senderJid, [senderParticipant], 'remove');
                             await sendMessageWithCounter(senderJid, { text: `❌ Enlace detectado. El usuario ha sido expulsado por enviar un link.` });
-                            log(conn, `🚫 Anti-Link: Mensaje con enlace de ${senderName} eliminado en [${senderJid}]. Usuario expulsado.`);
+                            log(conn, `🚫 Anti-Link: Mensaje con enlace de ${senderName} eliminado en [${senderJid}]. Usuario expulsado.`, conn, CREATOR_JID);
                         } else {
-                            log(conn, `ℹ️ Anti-Link: Enlace ignorado, el remitente es un administrador.`);
+                            log(conn, `ℹ️ Anti-Link: Enlace ignorado, el remitente es un administrador.`, conn, CREATOR_JID);
                         }
                     } catch (e) {
-                        logError(conn, `Error en Anti-Link: ${e.message}`);
+                        logError(conn, `Error en Anti-Link: ${e.message}`, conn, CREATOR_JID);
                     }
                     return;
                 }
@@ -234,7 +233,7 @@ async function connectToWhatsApp(skipQr = false) {
                     for (const word of OFFENSIVE_WORDS) {
                         if (messageText.toLowerCase().includes(word.toLowerCase())) {
                             await sendMessageWithCounter(senderJid, { text: `⚠️ Por favor, mantén un lenguaje respetuoso. El uso de palabras ofensivas no está permitido.` });
-                            log(conn, `😠 Alerta: Palabra ofensiva detectada de ${senderName} en [${senderJid}]`);
+                            log(conn, `😠 Alerta: Palabra ofensiva detectada de ${senderName} en [${senderJid}]`, conn, CREATOR_JID);
                             return;
                         }
                     }
@@ -268,19 +267,19 @@ async function main() {
     if (!fs.existsSync('./session')) fs.mkdirSync('./session');
     const sessionExists = fs.existsSync('./session/creds.json');
     if (sessionExists) {
-        log(null, '✅ Sesión encontrada. Iniciando conexión automáticamente...');
+        log(null, '✅ Sesión encontrada. Iniciando conexión automáticamente...', null, CREATOR_JID);
         await connectToWhatsApp(true);
     } else {
-        log(null, 'ℹ️ No se encontró sesión. Se requiere escanear el código QR.');
+        log(null, 'ℹ️ No se encontró sesión. Se requiere escanear el código QR.', null, CREATOR_JID);
         await connectToWhatsApp(false);
         const checkQrInterval = setInterval(() => {
             if (qrCodeData) {
                 clearInterval(checkQrInterval);
                 rl.question(`\n${chalk.hex('#FFD700')('¿Deseas empezar? (Y/n):')} `, async (answer) => {
                     if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
-                        log(null, '📌 Escaneando código QR...');
+                        log(null, '📌 Escaneando código QR...', null, CREATOR_JID);
                     } else {
-                        log(null, 'Cerrando bot. ¡Hasta pronto!');
+                        log(null, 'Cerrando bot. ¡Hasta pronto!', null, CREATOR_JID);
                         process.exit();
                     }
                 });
