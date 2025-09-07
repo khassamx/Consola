@@ -63,7 +63,7 @@ const handleConsoleInput = async (input, sock) => {
             const uptimeMinutes = Math.floor((uptime % 3600) / 60);
             const uptimeSeconds = Math.floor(uptime % 60);
             const freeMem = (os.freemem() / 1204 / 1024).toFixed(2);
-            const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
+            const totalMem = (os.totalmem() / 1204 / 1024).toFixed(2);
             log(sock, `
 ✅ Estado del Bot:
   - En línea: Sí
