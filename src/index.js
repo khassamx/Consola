@@ -5,7 +5,6 @@ const cron = require('node-cron');
 const qrcode = require('qrcode-terminal');
 const fs = require('fs');
 const os = require('os');
-const chalk = require('chalk');
 
 const { CREATOR_JID, OFFENSIVE_WORDS, isAntiLinkEnabled, isWordFilterEnabled, isWelcomeMessageEnabled, isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, botMode, botVersion, isAntiPrefixEnabled, arabicPrefixes, isRemoteConsoleEnabled, remoteConsoleJid, COMMAND_STATUS } = require('./config');
 const { log, logError } = require('./utils/logger');
@@ -19,6 +18,7 @@ const { sendUserMenu } = require('./handlers/userMenu');
 const width = 70;
 const height = 20;
 
+// Halcón frames para animación
 const halconFrames = [
   `  __🦅__ `,
   ` <(🦅 )> `,
@@ -32,10 +32,19 @@ const welcomeFrames = [
   "      CREADO POR NOADEVSTUDIO      "
 ];
 
-const rainbowColors = [chalk.red, chalk.yellow, chalk.green, chalk.cyan, chalk.blue, chalk.magenta];
+// Colores ANSI para el efecto arcoíris, sin la librería 'chalk'
+const ansiColors = [
+    "\x1b[31m", // Rojo
+    "\x1b[33m", // Amarillo
+    "\x1b[32m", // Verde
+    "\x1b[36m", // Cian
+    "\x1b[34m", // Azul
+    "\x1b[35m", // Magenta
+];
+const resetColor = "\x1b[0m";
 
 function rainbowText(text) {
-  return text.split('').map((c, i) => rainbowColors[i % rainbowColors.length](c)).join('');
+    return text.split('').map((c, i) => ansiColors[i % ansiColors.length] + c).join('') + resetColor;
 }
 
 let pos = 0;
@@ -69,7 +78,6 @@ let cloudLayer1 = Array.from({ length: width }, () => Math.random() < 0.12 ? '�
 let cloudLayer2 = Array.from({ length: width }, () => Math.random() < 0.08 ? '☁️' : ' ');
 let starsLayer = Array.from({ length: width }, () => Math.random() < 0.05 ? '✨' : ' ');
 
-// Función principal para dibujar la animación
 function drawFrame() {
   console.clear();
 
@@ -299,7 +307,7 @@ async function main() {
         const checkQrInterval = setInterval(() => {
             if (qrCodeData) {
                 clearInterval(checkQrInterval);
-                rl.question(`\n${chalk.hex('#FFD700')('¿Deseas empezar? (Y/n):')} `, async (answer) => {
+                rl.question(`\n${rainbowText('¿Deseas empezar? (Y/n):')} `, async (answer) => {
                     if (answer.toLowerCase() === 'y' || answer.toLowerCase() === 'yes') {
                         log(null, '📌 Escaneando código QR...');
                     } else {
