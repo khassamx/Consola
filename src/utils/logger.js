@@ -1,25 +1,25 @@
 const sendRemoteLog = async (sock, remoteChatId, message) => {
     if (!sock || !remoteChatId) {
-        console.warn('Consola remota no definida, log local:', message);
+        console.warn(`[Log] Consola remota no definida, log local: ${message}`);
         return;
     }
     try {
         await sock.sendMessage(remoteChatId, { text: message });
     } catch (err) {
-        console.error('Error al enviar log remoto:', err);
+        console.error(`[Error] Fallo al enviar log remoto: ${err.message}`);
     }
 };
 
-const log = (source, message, sock, remoteChatId) => {
+const log = (message, sock = null, remoteChatId = null) => {
     const timestamp = new Date().toISOString();
-    const formattedMessage = `[${timestamp}] ${source ? `[${source}]` : ''} ${message}`;
+    const formattedMessage = `[${timestamp}] ${message}`;
     console.log(formattedMessage);
     sendRemoteLog(sock, remoteChatId, formattedMessage);
 };
 
-const logError = (source, error, sock, remoteChatId) => {
+const logError = (error, sock = null, remoteChatId = null) => {
     const timestamp = new Date().toISOString();
-    const formattedMessage = `[${timestamp}] ${source ? `[${source}]` : ''} ❌ ERROR: ${error}`;
+    const formattedMessage = `[${timestamp}] ❌ ERROR: ${error}`;
     console.error(formattedMessage);
     sendRemoteLog(sock, remoteChatId, formattedMessage);
 };
