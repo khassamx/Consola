@@ -13,7 +13,6 @@ const { handleCreatorCommands } = require('./handlers/creatorCommands');
 const { sendFuturisticMenu, sendFuturisticSection } = require('./handlers/futuristicMenu');
 const { sendUserMenu } = require('./handlers/userMenu');
 
-// Dimensiones para la animación
 const width = 70;
 const height = 20;
 
