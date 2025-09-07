@@ -17,7 +17,6 @@ const { sendUserMenu } = require('./handlers/userMenu');
 const width = 70;
 const height = 20;
 
-// Halcón frames para animación
 const halconFrames = [
   `  __🦅__ `,
   ` <(🦅 )> `,
@@ -45,7 +44,6 @@ let qrCodeData = null;
 let botIsReady = false;
 let conn = null;
 
-// Variables globales para el nuevo contador y el estado
 let mensajesEnviados = 0;
 
 const rl = readline.createInterface({
@@ -57,7 +55,6 @@ let cloudLayer1 = Array.from({ length: width }, () => Math.random() < 0.12 ? '�
 let cloudLayer2 = Array.from({ length: width }, () => Math.random() < 0.08 ? '☁️' : ' ');
 let starsLayer = Array.from({ length: width }, () => Math.random() < 0.05 ? '✨' : ' ');
 
-// Función auxiliar para enviar mensajes e incrementar el contador
 async function sendMessageWithCounter(jid, content) {
     try {
         const result = await conn.sendMessage(jid, content);
@@ -97,7 +94,6 @@ function drawFrame() {
   console.log('_'.repeat(width));
   console.log("\n".repeat(2));
   
-  // Nuevo: Mostrar fecha y hora
   const now = new Date();
   const dateStr = now.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' });
   const timeStr = now.toLocaleTimeString('es-ES', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 });
@@ -124,7 +120,6 @@ function drawFrame() {
 
 const animationInterval = setInterval(drawFrame, 120);
 
-// Funciones de Baileys
 async function connectToWhatsApp(skipQr = false) {
     const sessionPath = './session';
     const { state, saveCreds } = await useMultiFileAuthState(sessionPath);
@@ -185,7 +180,7 @@ async function connectToWhatsApp(skipQr = false) {
                      const uptimeSeconds = Math.floor(uptime % 60);
                      const freeMem = (os.freemem() / 1024 / 1024).toFixed(2);
                      const totalMem = (os.totalmem() / 1024 / 1024).toFixed(2);
-                     await conn.sendMessage(senderJid, { text: `
+                     await sendMessageWithCounter(senderJid, { text: `
 *✅ Estado del Bot (Consola Remota)*
   - En línea: Sí
   - Tiempo de actividad: ${uptimeDays}d, ${uptimeHours}h, ${uptimeMinutes}m, ${uptimeSeconds}s
@@ -257,11 +252,9 @@ async function connectToWhatsApp(skipQr = false) {
     });
 }
 
-// Lógica de inicio
 async function main() {
     if (!fs.existsSync('./logs')) fs.mkdirSync('./logs');
     if (!fs.existsSync('./session')) fs.mkdirSync('./session');
-
     const sessionExists = fs.existsSync('./session/creds.json');
     if (sessionExists) {
         log(null, '✅ Sesión encontrada. Iniciando conexión automáticamente...');
