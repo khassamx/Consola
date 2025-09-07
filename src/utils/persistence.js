@@ -2,91 +2,66 @@ const fs = require('fs');
 const path = require('path');
 const { log, logError } = require('./logger');
 
-const sentUsersFilePath = path.join(__dirname, '..', '..', 'data', 'sentUsers.json');
-const chatHistoryPath = path.join(__dirname, '..', '..', 'data', 'historial.json');
+const sentUsersFilePath = path.join(__dirname, '..', '..', 'data', 'sent_users.json');
 
-let sentUsers = [];
-let chatHistory = [];
+let sentUsers = new Set();
 
-function loadSentRecords() {
-    try {
-        if (fs.existsSync(sentUsersFilePath)) {
+const ensureDataDirectoryExists = () => {
+    const dir = path.dirname(sentUsersFilePath);
+    if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+    }
+};
+
+const loadSentRecords = (sock) => {
+    ensureDataDirectoryExists();
+    if (fs.existsSync(sentUsersFilePath)) {
+        try {
             const data = fs.readFileSync(sentUsersFilePath, 'utf8');
-            sentUsers = JSON.parse(data);
-            log(`✅ Registros de usuarios enviados cargados: ${sentUsers.length} usuarios.`);
-        } else {
-            fs.mkdirSync(path.dirname(sentUsersFilePath), { recursive: true });
-            fs.writeFileSync(sentUsersFilePath, '[]', 'utf8');
-            log('✅ Archivo sentUsers.json creado.');
+            const userArray = JSON.parse(data);
+            sentUsers = new Set(userArray);
+            log(sock, `✅ Registros de usuarios cargados: ${sentUsers.size} entradas.`);
+        } catch (error) {
+            logError(sock, `Error al cargar registros de usuarios: ${error.message}`);
         }
-    } catch (e) {
-        logError(`❌ Error al cargar sentUsers.json: ${e.message}`);
-        sentUsers = [];
+    } else {
+        log(sock, 'ℹ️ No se encontraron registros de usuarios. Se creará un nuevo archivo.');
     }
-}
+};
 
-function saveSentRecords() {
+const saveSentRecords = (sock) => {
+    ensureDataDirectoryExists();
     try {
-        fs.writeFileSync(sentUsersFilePath, JSON.stringify(sentUsers, null, 2), 'utf8');
-        log('💾 Registros de usuarios guardados.');
-    } catch (e) {
-        logError(`❌ Error al guardar sentUsers.json: ${e.message}`);
+        const userArray = Array.from(sentUsers);
+        fs.writeFileSync(sentUsersFilePath, JSON.stringify(userArray, null, 2), 'utf8');
+        log(sock, '✅ Registros de usuarios guardados con éxito.');
+    } catch (error) {
+        logError(sock, `Error al guardar registros de usuarios: ${error.message}`);
     }
-}
+};
 
-function getSentUsers() {
-    return sentUsers;
-}
-
-function addSentUser(jid) {
-    if (!sentUsers.includes(jid)) {
-        sentUsers.push(jid);
-        saveSentRecords();
+const addSentUser = (sock, jid) => {
+    if (!sentUsers.has(jid)) {
+        sentUsers.add(jid);
+        log(sock, `✅ Usuario ${jid} añadido a la lista de registros.`);
+        saveSentRecords(sock);
+        return true;
     }
-}
+    return false;
+};
 
-function loadChatHistory() {
-    try {
-        if (fs.existsSync(chatHistoryPath)) {
-            const data = fs.readFileSync(chatHistoryPath, 'utf8');
-            chatHistory = JSON.parse(data);
-            log(`✅ Historial de chat cargado: ${chatHistory.length} registros.`);
-        } else {
-            fs.mkdirSync(path.dirname(chatHistoryPath), { recursive: true });
-            fs.writeFileSync(chatHistoryPath, '[]', 'utf8');
-            log('✅ Archivo historial.json creado.');
-        }
-    } catch (e) {
-        logError(`❌ Error al cargar historial.json: ${e.message}`);
-        chatHistory = [];
-    }
-}
+const hasSentToUser = (jid) => {
+    return sentUsers.has(jid);
+};
 
-function saveChatHistory() {
-    try {
-        fs.writeFileSync(chatHistoryPath, JSON.stringify(chatHistory, null, 2), 'utf8');
-        log('💾 Historial de chat guardado.');
-    } catch (e) {
-        logError(`❌ Error al guardar historial.json: ${e.message}`);
-    }
-}
-
-function getChatHistory() {
-    return chatHistory;
-}
-
-function addChatRecord(record) {
-    chatHistory.push(record);
-    saveChatHistory();
-}
+const getSentUsers = () => {
+    return Array.from(sentUsers);
+};
 
 module.exports = {
     loadSentRecords,
-    saveSentRecords,
-    getSentUsers,
     addSentUser,
-    loadChatHistory,
-    saveChatHistory,
-    getChatHistory,
-    addChatRecord
+    hasSentToUser,
+    getSentUsers,
+    saveSentRecords
 };
