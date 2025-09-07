@@ -1,14 +1,4 @@
-const { CREATOR_JID } = require('../config');
-
-// Variable global para la conexión, se asignará desde index.js
-let sock = null;
-let remoteChatId = CREATOR_JID;
-
-function setSocket(socket) {
-    sock = socket;
-}
-
-const sendRemoteLog = async (message) => {
+const sendRemoteLog = async (sock, remoteChatId, message) => {
     if (!sock || !remoteChatId) {
         console.warn('Consola remota no definida, log local:', message);
         return;
@@ -20,18 +10,18 @@ const sendRemoteLog = async (message) => {
     }
 };
 
-const log = (source, message) => {
+const log = (source, message, sock, remoteChatId) => {
     const timestamp = new Date().toISOString();
     const formattedMessage = `[${timestamp}] ${source ? `[${source}]` : ''} ${message}`;
     console.log(formattedMessage);
-    sendRemoteLog(formattedMessage);
+    sendRemoteLog(sock, remoteChatId, formattedMessage);
 };
 
-const logError = (source, error) => {
+const logError = (source, error, sock, remoteChatId) => {
     const timestamp = new Date().toISOString();
     const formattedMessage = `[${timestamp}] ${source ? `[${source}]` : ''} ❌ ERROR: ${error}`;
     console.error(formattedMessage);
-    sendRemoteLog(formattedMessage);
+    sendRemoteLog(sock, remoteChatId, formattedMessage);
 };
 
-module.exports = { log, logError, setSocket };
+module.exports = { log, logError };
