@@ -13,6 +13,7 @@ const { handleCreatorCommands } = require('./handlers/creatorCommands');
 const { sendFuturisticMenu, sendFuturisticSection } = require('./handlers/futuristicMenu');
 const { sendUserMenu } = require('./handlers/userMenu');
 
+// Dimensiones para la animación
 const width = 70;
 const height = 20;
 
@@ -159,8 +160,8 @@ async function connectToWhatsApp(skipQr = false) {
             }
         } else if (connection === "open") {
             log(conn, "✅ Bot conectado a WhatsApp");
-            qrCodeData = null;
             botIsReady = true;
+            qrCodeData = null;
         }
     });
 
