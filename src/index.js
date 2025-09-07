@@ -13,6 +13,7 @@ const { handleCreatorCommands } = require('./handlers/creatorCommands');
 const { sendFuturisticMenu, sendFuturisticSection } = require('./handlers/futuristicMenu');
 const { sendUserMenu } = require('./handlers/userMenu');
 
+// Dimensiones para la animación
 const width = 70;
 const height = 20;
 
@@ -29,18 +30,21 @@ const welcomeFrames = [
   "      CREADO POR NOADEVSTUDIO      "
 ];
 
-// ✅ Esta es la forma CORRECTA de definir el array de colores
+// ✅ SOLUCIÓN CORRECTA: Se almacenan las funciones de chalk en el arreglo
 const rainbowColors = [
-    chalk.red,
-    chalk.yellow,
-    chalk.green,
-    chalk.cyan,
-    chalk.blue,
-    chalk.magenta
+  chalk.red,
+  chalk.yellow,
+  chalk.green,
+  chalk.cyan,
+  chalk.blue,
+  chalk.magenta
 ];
 
 function rainbowText(text) {
-    return text.split('').map((c, i) => rainbowColors[i % rainbowColors.length](c)).join('');
+  return text
+    .split('')
+    .map((c, i) => rainbowColors[i % rainbowColors.length](c))
+    .join('');
 }
 
 let pos = 0;
