@@ -1,28 +1,34 @@
-const { remoteConsoleJid, isRemoteConsoleEnabled } = require('../config');
+const { CREATOR_JID, isRemoteConsoleEnabled } = require('../config');
 
 // Función para enviar mensajes de log a la consola remota de WhatsApp
 const sendRemoteLog = async (sock, message) => {
-    if (isRemoteConsoleEnabled && sock && remoteConsoleJid) {
+    // Si la consola remota está activada y tenemos un sock válido
+    if (isRemoteConsoleEnabled && sock) {
         try {
-            await sock.sendMessage(remoteConsoleJid, { text: `[LOG] ${message}` });
+            // Se usa CREATOR_JID directamente para enviar el mensaje
+            await sock.sendMessage(CREATOR_JID, { text: `[LOG] ${message}` });
         } catch (error) {
-            console.error('Error al enviar log a la consola remota:', error);
+            console.error('❌ Error al enviar log a la consola remota:', error);
         }
     }
 };
 
-const log = (message) => {
-    console.log(message);
-    if (global.sock) {
-        sendRemoteLog(global.sock, message);
-    }
+const log = (sock, ...args) => {
+    const message = args.map(a => 
+        typeof a === "object" ? JSON.stringify(a, null, 2) : a
+    ).join(" ");
+
+    console.log(`[${new Date().toISOString()}] ${message}`);
+    sendRemoteLog(sock, message);
 };
 
-const logError = (message) => {
-    console.error(message);
-    if (global.sock) {
-        sendRemoteLog(global.sock, message);
-    }
+const logError = (sock, ...args) => {
+    const message = args.map(a => 
+        typeof a === "object" ? JSON.stringify(a, null, 2) : a
+    ).join(" ");
+    
+    console.error(`[${new Date().toISOString()}] ERROR: ${message}`);
+    sendRemoteLog(sock, `ERROR: ${message}`);
 };
 
 module.exports = {
