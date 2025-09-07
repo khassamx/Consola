@@ -1,4 +1,5 @@
 const { isAntiSpamEnabled, ANTI_SPAM_THRESHOLD, COMMAND_STATUS } = require('../config');
+const { log, logError } = require('../utils/logger');
 
 const lastMessageTimestamps = new Map();
 
